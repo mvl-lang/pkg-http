@@ -35,6 +35,74 @@ partial fn handle(req: Request, matched: MatchedRoute) -> Response {
 }
 ```
 
+### Static File Serving
+
+```mvl
+use pkg.http.{serve_dir, Request, Response, Router, MatchedRoute,
+              new_router, route, dispatch, ok, not_found}
+
+fn setup_router() -> Router {
+    let r: Router = new_router();
+    route(r, Method::Get, "/api/health", "health")
+}
+
+partial fn handle(req: Request, matched: MatchedRoute) -> Response ! FileRead {
+    match matched.name {
+        "health" => ok("{\"status\": \"ok\"}"),
+        _        => not_found(),
+    }
+}
+
+// In your dispatcher, fall through to serve_dir for unmatched routes:
+partial fn dispatcher(req: Request) -> Response ! FileRead {
+    let r: Router = setup_router();
+    match dispatch(r, req) {
+        Ok(matched) => handle(req, matched),
+        Err(_)      => if req.path.starts_with("/docs") {
+            serve_dir("/docs", "./swagger-ui", req)
+        } else {
+            not_found()
+        },
+    }
+}
+```
+
+`serve_dir("/docs", "./swagger-ui", req)` maps URL paths to filesystem paths:
+
+| Request | File served |
+|---------|-------------|
+| `GET /docs/index.html` | `./swagger-ui/index.html` |
+| `GET /docs/` | `./swagger-ui/index.html` (auto-index) |
+| `GET /docs/css/style.css` | `./swagger-ui/css/style.css` |
+| `GET /docs/missing.txt` | 404 |
+| `GET /docs/../etc/passwd` | 403 (path traversal blocked) |
+
+## Security
+
+### Path Traversal Protection
+
+`serve_dir` splits the request path on `/` and rejects any segment that is `..`. This prevents directory traversal attacks before any filesystem access occurs.
+
+```
+GET /docs/../etc/passwd  → 403 Forbidden  (blocked by has_traversal check)
+GET /docs/../../secret   → 403 Forbidden
+GET /docs/..             → 403 Forbidden
+```
+
+### IFC Integration
+
+File contents read from disk are returned as `Tainted[String]` by `std.io.read_file`. Before including them in the HTTP response, `serve_dir` detaints with an explicit audit tag:
+
+```mvl
+let content: String = relabel trust(raw, "HTTP-STATIC-FILE");
+```
+
+This is safe because the path has already been validated — `has_traversal` confirms it stays within the served directory. The audit tag `"HTTP-STATIC-FILE"` makes this trust boundary visible in security reviews.
+
+### Effect Requirement
+
+`serve_dir` requires `! FileRead` — the compiler enforces that only functions declaring this effect can serve static files. Pure handler functions cannot accidentally access the filesystem.
+
 ## Modules
 
 ### `http.mvl` — Core
