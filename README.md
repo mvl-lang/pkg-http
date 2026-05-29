@@ -7,7 +7,7 @@ Pure MVL — no `bridge.rs`, no `extern` blocks. Fully verified against all 11 c
 ## Install
 
 ```bash
-mvl add github.com/mvl-lang/pkg-http v0.1.0
+mvl add github.com/mvl-lang/pkg-http v0.2.0
 mvl install
 ```
 
@@ -48,6 +48,7 @@ Types, parsing, routing, and response building.
 | **Response** | `respond`, `ok`, `created`, `not_found`, `error_response`, `serialize_response` |
 | **Routing** | `new_router`, `route`, `dispatch` |
 | **Server** | `ConnectionHandler` (actor), `Dispatcher` (fn type) |
+| **Static Files** | `serve_dir`, `mime_type` |
 
 ### `rest.mvl` — JSON REST Helpers
 
