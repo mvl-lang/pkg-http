@@ -60,14 +60,17 @@ pub type Status = enum {
 }
 
 /// Extract the numeric status code.
-pub fn status_code(s: val Status) -> Int {
+///
+/// Refined return type `[100, 600)` is statically declared — every enum variant maps
+/// to a constant that the checker can verify satisfies the bound without a wrapper call.
+pub total fn status_code(s: val Status) -> Int where self >= 100 && self < 600 {
     match s {
         Status::Http200Ok                  => 200,
         Status::Http201Created             => 201,
         Status::Http202Accepted            => 202,
         Status::Http204NoContent           => 204,
         Status::Http301MovedPermanently    => 301,
-        Status::Http302Found              => 302,
+        Status::Http302Found               => 302,
         Status::Http304NotModified         => 304,
         Status::Http400BadRequest          => 400,
         Status::Http401Unauthorized        => 401,
@@ -75,7 +78,7 @@ pub fn status_code(s: val Status) -> Int {
         Status::Http404NotFound            => 404,
         Status::Http405MethodNotAllowed    => 405,
         Status::Http409Conflict            => 409,
-        Status::Http410Gone               => 410,
+        Status::Http410Gone                => 410,
         Status::Http422UnprocessableEntity => 422,
         Status::Http429TooManyRequests     => 429,
         Status::Http500InternalServerError => 500,
@@ -87,14 +90,14 @@ pub fn status_code(s: val Status) -> Int {
 }
 
 /// Extract the reason phrase.
-pub fn status_reason(s: val Status) -> String {
+pub total fn status_reason(s: val Status) -> String {
     match s {
         Status::Http200Ok                  => "OK",
         Status::Http201Created             => "Created",
         Status::Http202Accepted            => "Accepted",
         Status::Http204NoContent           => "No Content",
         Status::Http301MovedPermanently    => "Moved Permanently",
-        Status::Http302Found              => "Found",
+        Status::Http302Found               => "Found",
         Status::Http304NotModified         => "Not Modified",
         Status::Http400BadRequest          => "Bad Request",
         Status::Http401Unauthorized        => "Unauthorized",
@@ -102,7 +105,7 @@ pub fn status_reason(s: val Status) -> String {
         Status::Http404NotFound            => "Not Found",
         Status::Http405MethodNotAllowed    => "Method Not Allowed",
         Status::Http409Conflict            => "Conflict",
-        Status::Http410Gone               => "Gone",
+        Status::Http410Gone                => "Gone",
         Status::Http422UnprocessableEntity => "Unprocessable Entity",
         Status::Http429TooManyRequests     => "Too Many Requests",
         Status::Http500InternalServerError => "Internal Server Error",
@@ -114,13 +117,13 @@ pub fn status_reason(s: val Status) -> String {
 }
 
 /// True for 2xx status codes.
-pub fn is_success(s: val Status) -> Bool {
+pub total fn is_success(s: val Status) -> Bool {
     let code: Int = status_code(s);
     if code >= 200 { code < 300 } else { false }
 }
 
 /// True for 4xx and 5xx status codes.
-pub fn is_error(s: val Status) -> Bool {
+pub total fn is_error(s: val Status) -> Bool {
     status_code(s) >= 400
 }
 
@@ -174,7 +177,7 @@ pub type HttpError = struct {
 // ── Parsing ───────────────────────────────────────────────────────────────────
 
 /// Convert an Option to a Result, mapping None to a parse-error HttpError.
-fn require(opt: Option[String], msg: String) -> Result[String, HttpError] {
+total fn require(opt: Option[String], msg: String) -> Result[String, HttpError] {
     match opt {
         Some(v) => Ok(v),
         None    => Err(HttpError { status: Status::Http400BadRequest, detail: msg }),
@@ -183,7 +186,7 @@ fn require(opt: Option[String], msg: String) -> Result[String, HttpError] {
 
 /// Parse an HTTP method string ("GET", "POST", etc.) into a Method enum.
 /// Return the canonical uppercase name for a Method.
-pub fn method_name(m: val Method) -> String {
+pub total fn method_name(m: val Method) -> String {
     match m {
         Method::Get     => "GET",
         Method::Post    => "POST",
@@ -195,7 +198,7 @@ pub fn method_name(m: val Method) -> String {
     }
 }
 
-pub fn parse_method(s: String) -> Result[Method, HttpError] {
+pub total fn parse_method(s: String) -> Result[Method, HttpError] {
     if s == "GET"     { Ok(Method::Get) }
     else if s == "POST"    { Ok(Method::Post) }
     else if s == "PUT"     { Ok(Method::Put) }
@@ -218,7 +221,7 @@ pub fn parse_method(s: String) -> Result[Method, HttpError] {
 // (double-decode is the dangerous bug class; the value carries Tainted, the
 // decoded form does not need re-decoding).
 
-fn hex_digit(c: String) -> Option[Int] {
+total fn hex_digit(c: String) -> Option[Int] {
     if      c == "0" { Some(0) } else if c == "1" { Some(1) }
     else if c == "2" { Some(2) } else if c == "3" { Some(3) }
     else if c == "4" { Some(4) } else if c == "5" { Some(5) }
@@ -233,12 +236,28 @@ fn hex_digit(c: String) -> Option[Int] {
     else { None }
 }
 
+/// Wrap `from_int` with an explicit [0, 255] constraint.
+///
+/// Creates a refinement proof obligation at each call site — callers must prove
+/// the value is a valid byte.  Used in `utf8_from_bytes` to document that codepoint
+/// arithmetic stays in range before handing off to `String::from_bytes`.
+total fn byte_value(n: Int where n >= 0 && n <= 255) -> Byte { from_int(n) }
+
+/// Combine two hex nibbles into a byte.
+///
+/// Each parameter is constrained to [0, 15] — callers must prove both bounds.
+/// The body calls `byte_value(h * 16 + l)`, creating an internal L2 arithmetic proof
+/// that `h * 16 + l ∈ [0, 255]` given h ≤ 15 and l ≤ 15 (max = 255).
+total fn hex_byte(h: Int where h >= 0 && h <= 15, l: Int where l >= 0 && l <= 15) -> Byte {
+    byte_value(h * 16 + l)
+}
+
 // Decode a list of percent-decoded bytes as UTF-8 into a String.
 // String::from_bytes uses Latin-1 (byte → same Unicode codepoint), so for 2-byte
 // UTF-8 sequences we compute the codepoint and re-encode via Latin-1, which is
 // correct for codepoints ≤ 255 (Latin-1 and Unicode codepoints agree in that range).
 // 3/4-byte sequences (cp > 255) fall back to per-byte Latin-1 passthrough.
-fn utf8_from_bytes(bytes: List[Byte]) -> String {
+total fn utf8_from_bytes(bytes: List[Byte]) -> String {
     let out: ref String = "";
     let i: ref Int = 0;
     let n: Int = bytes.len();
@@ -251,10 +270,11 @@ fn utf8_from_bytes(bytes: List[Byte]) -> String {
             let b1: Int = match bytes.get(i) { Some(b) => b.to_int(), None => 128 };
             i = i + 1;
             let cp: Int = (b0 - 192) * 64 + (b1 - 128);
-            if cp <= 255 {
-                out = out.concat(String::from_bytes([from_int(cp)]))
+            if cp >= 0 && cp <= 255 {
+                out = out.concat(String::from_bytes([byte_value(cp)]))
             } else {
-                out = out.concat(String::from_bytes([from_int(b0), from_int(b1)]))
+                // b0 ∈ [192, 223] from the outer branch condition → byte_value(b0) is L1:trivial
+                out = out.concat(String::from_bytes([byte_value(b0), from_int(b1)]))
             }
         } else {
             out = out.concat(String::from_bytes([from_int(b0)]))
@@ -263,7 +283,7 @@ fn utf8_from_bytes(bytes: List[Byte]) -> String {
     out
 }
 
-fn flush_bytes(out: String, pending: List[Byte]) -> String {
+total fn flush_bytes(out: String, pending: List[Byte]) -> String {
     if pending.len() == 0 { out } else { out.concat(utf8_from_bytes(pending)) }
 }
 
@@ -278,18 +298,14 @@ fn flush_bytes(out: String, pending: List[Byte]) -> String {
 ///
 /// Module-private: callers should use `parse_query` (which re-taints values).
 /// Exposing this would let a downstream caller double-decode and bypass taint.
-fn percent_decode(s: String) -> String {
+total fn percent_decode(s: String) -> String {
     let out: ref String = "";
     let pending: ref List[Byte] = [];
     let pct_buf: ref String = "";
-    let hex_high: ref Int = 0;
     for c in s.chars() {
         if pct_buf == "%" {
             match hex_digit(c) {
-                Some(h) => {
-                    pct_buf  = pct_buf.concat(c);
-                    hex_high = h
-                },
+                Some(_) => { pct_buf = pct_buf.concat(c) },
                 None    => {
                     out     = flush_bytes(out, pending);
                     pending = [];
@@ -302,9 +318,36 @@ fn percent_decode(s: String) -> String {
             }
         } else if pct_buf.len() == 2 {
             match hex_digit(c) {
-                Some(h) => {
-                    pending.push(from_int(hex_high * 16 + h));
-                    pct_buf = ""
+                Some(low) => {
+                    // Re-decode the high nibble from the char stored in pct_buf.
+                    // pct_buf == "%X" so pct_buf.char_at(1) is X — always a valid hex char
+                    // because it was stored only after hex_digit returned Some.
+                    // Both `high` and `low` come from hex_digit in this scope → both are
+                    // known to be in [0,15], making hex_byte(high, low) L1:trivial.
+                    match hex_digit(pct_buf.char_at(1).unwrap_or("0")) {
+                        Some(high) => {
+                            // hex_digit returns [0,15] for both nibbles.
+                            // Explicit guard lets the prover discharge hex_byte's
+                            // `where` constraints at L1:trivial (same pattern as
+                            // the `cp >= 0 && cp <= 255` guard in utf8_from_bytes).
+                            // The else branch is unreachable in practice.
+                            if high >= 0 && high <= 15 && low >= 0 && low <= 15 {
+                                pending.push(hex_byte(high, low));
+                                pct_buf = ""
+                            } else {
+                                pending.push(from_int(0));
+                                pct_buf = ""
+                            }
+                        },
+                        None => {
+                            // Unreachable: pct_buf[1] was accepted by hex_digit when stored.
+                            // Emit the partial escape literally and continue.
+                            out     = flush_bytes(out, pending);
+                            pending = [];
+                            out     = out.concat(pct_buf);
+                            pct_buf = ""
+                        },
+                    }
                 },
                 None    => {
                     out     = flush_bytes(out, pending);
@@ -335,13 +378,13 @@ fn percent_decode(s: String) -> String {
 
 // `{}` parses as an empty block, not an empty map literal — workaround taken
 // from std.json.empty_object.
-fn empty_query_map() -> Map[String, List[Tainted[String]]] {
+total fn empty_query_map() -> Map[String, List[Tainted[String]]] {
     let m: ref Map[String, List[Tainted[String]]] = {"__mvl_query_init__": []};
     m.remove("__mvl_query_init__");
     m
 }
 
-fn append_query(m: Map[String, List[Tainted[String]]], key: String, value: Tainted[String]) -> Map[String, List[Tainted[String]]] {
+total fn append_query(m: Map[String, List[Tainted[String]]], key: String, value: Tainted[String]) -> Map[String, List[Tainted[String]]] {
     let r: ref Map[String, List[Tainted[String]]] = m;
     let updated: ref List[Tainted[String]] = match r.get(key) {
         Some(existing) => existing,
@@ -366,7 +409,7 @@ fn append_query(m: Map[String, List[Tainted[String]]], key: String, value: Taint
 /// attacker controls the key set.
 ///
 /// Module-private: caller is `parse_request`.
-fn parse_query(raw: String) -> Map[String, List[Tainted[String]]] {
+total fn parse_query(raw: String) -> Map[String, List[Tainted[String]]] {
     let result: ref Map[String, List[Tainted[String]]] = empty_query_map();
     if raw.len() > 0 {
         for p in raw.split("&") {
@@ -394,7 +437,7 @@ fn parse_query(raw: String) -> Map[String, List[Tainted[String]]] {
 /// Each line must be of the form `Name: Value`.  Names are lowercased so
 /// callers can look up with any case (e.g. `header(req, "content-type")`).
 /// Lines that don't contain `:` are silently skipped.
-fn parse_headers(lines: List[String]) -> Map[String, String] {
+total fn parse_headers(lines: List[String]) -> Map[String, String] {
     let m: ref Map[String, String] = Map::new();
     for line in lines {
         match line.find(":") {
@@ -416,7 +459,7 @@ fn parse_headers(lines: List[String]) -> Map[String, String] {
 ///
 /// Distinguishes "absent" (`None`) from "present with empty value" (`Some("")`),
 /// e.g. `?flag` → `Some("")`.  Use `query_all` when you need every value.
-pub fn query_first(req: val Request, key: String) -> Option[Tainted[String]] {
+pub total fn query_first(req: val Request, key: String) -> Option[Tainted[String]] {
     match req.query.get(key) {
         None       => None,
         Some(vals) => vals.get(0),
@@ -428,7 +471,7 @@ pub fn query_first(req: val Request, key: String) -> Option[Tainted[String]] {
 ///
 /// Returns `[]` for both "absent" and "present with no values" — these cases
 /// are indistinguishable.  Use `query_first` if you need to tell them apart.
-pub fn query_all(req: val Request, key: String) -> List[Tainted[String]] {
+pub total fn query_all(req: val Request, key: String) -> List[Tainted[String]] {
     match req.query.get(key) {
         None       => [],
         Some(vals) => vals,
@@ -438,7 +481,7 @@ pub fn query_all(req: val Request, key: String) -> List[Tainted[String]] {
 /// Look up a request header by name (case-insensitive).
 ///
 /// Header names are stored lowercased; callers may pass any case.
-pub fn header(req: val Request, key: String) -> Option[String] {
+pub total fn header(req: val Request, key: String) -> Option[String] {
     req.headers.get(key.to_lower())
 }
 
@@ -450,7 +493,7 @@ type PathQuery = struct {
 }
 
 /// Split a request target on the first `?` and strip any `#fragment`.
-fn split_target(target: String) -> PathQuery {
+total fn split_target(target: String) -> PathQuery {
     let target_len: Int = target.len();
     let no_frag: String = match target.find("#") {
         None    => target.substring(0, target_len),
@@ -473,7 +516,7 @@ fn split_target(target: String) -> PathQuery {
 /// Query *values* are re-tainted inside `parse_query`; the body is re-tainted
 /// with `HTTP-BODY` — both remain `Tainted` to prevent accidental logging.
 /// Header names are lowercased for case-insensitive lookup via `header()`.
-pub fn parse_request(raw: Tainted[String]) -> Result[Request, HttpError] {
+pub total fn parse_request(raw: Tainted[String]) -> Result[Request, HttpError] {
     let s: String = relabel trust(raw, "HTTP-REQUEST-LINE");
     let lines: List[String] = s.split("\r\n");
     let request_line: String = require(lines.get(0), "empty request")?;
@@ -524,7 +567,7 @@ pub fn parse_request(raw: Tainted[String]) -> Result[Request, HttpError] {
 // ── Serialization ─────────────────────────────────────────────────────────────
 
 /// Format response headers as HTTP header lines.
-fn format_headers(headers: Map[String, String]) -> String {
+total fn format_headers(headers: Map[String, String]) -> String {
     let keys: List[String] = headers.keys().sort();
     let result: ref String = "";
     for k in keys {
@@ -540,7 +583,7 @@ fn format_headers(headers: Map[String, String]) -> String {
 }
 
 /// Serialize a Response to an HTTP/1.0 response string.
-pub fn serialize_response(resp: val Response) -> String {
+pub total fn serialize_response(resp: val Response) -> String {
     let status_line: String = "HTTP/1.0 "
         .concat(status_code(resp.status).to_string())
         .concat(" ")
@@ -556,7 +599,7 @@ pub fn serialize_response(resp: val Response) -> String {
 // ── Constructors ──────────────────────────────────────────────────────────────
 
 /// Build a Response from a status and body.
-pub fn respond(status: Status, body: String) -> Response {
+pub total fn respond(status: Status, body: String) -> Response {
     Response {
         status: status,
         headers: {"Content-Type": "text/plain"},
@@ -565,27 +608,27 @@ pub fn respond(status: Status, body: String) -> Response {
 }
 
 /// Build a Response from an HttpError.
-pub fn error_response(e: val HttpError) -> Response {
+pub total fn error_response(e: val HttpError) -> Response {
     respond(e.status, e.detail)
 }
 
 /// Build an HttpError.
-pub fn http_error(status: Status, detail: String) -> HttpError {
+pub total fn http_error(status: Status, detail: String) -> HttpError {
     HttpError { status: status, detail: detail }
 }
 
 /// 200 OK with a text/plain body.
-pub fn ok(body: String) -> Response {
+pub total fn ok(body: String) -> Response {
     respond(Status::Http200Ok, body)
 }
 
 /// 201 Created with a text/plain body.
-pub fn created(body: String) -> Response {
+pub total fn created(body: String) -> Response {
     respond(Status::Http201Created, body)
 }
 
 /// 404 Not Found with empty body.
-pub fn not_found() -> Response {
+pub total fn not_found() -> Response {
     respond(Status::Http404NotFound, "")
 }
 
@@ -614,12 +657,12 @@ pub type Router = struct {
 }
 
 /// Create an empty router.
-pub fn new_router() -> Router {
+pub total fn new_router() -> Router {
     Router { routes: [] }
 }
 
 /// Append a route to the router (first registered, first matched).
-pub fn route(r: val Router, method: Method, pattern: String, name: String) -> Router {
+pub total fn route(r: val Router, method: Method, pattern: String, name: String) -> Router {
     let new_routes: ref List[Route] = r.routes;
     new_routes.push(Route { method: method, pattern: pattern, name: name });
     Router { routes: new_routes }
@@ -628,7 +671,7 @@ pub fn route(r: val Router, method: Method, pattern: String, name: String) -> Ro
 /// Match a URL pattern against a concrete path, extracting `{param}` bindings.
 ///
 /// Returns `None` if the segment count differs or any literal segment mismatches.
-fn match_path(pattern: String, path: String) -> Option[Map[String, String]] {
+total fn match_path(pattern: String, path: String) -> Option[Map[String, String]] {
     let pat_segs: List[String] = pattern.split("/");
     let path_segs: List[String] = path.split("/");
     if pat_segs.len() != path_segs.len() {
@@ -662,7 +705,7 @@ fn match_path(pattern: String, path: String) -> Option[Map[String, String]] {
 /// Returns the matched route name and extracted path params on success.
 /// Returns `Http405MethodNotAllowed` if the path matches but no route accepts
 /// the method; `Http404NotFound` if no route matches the path at all.
-pub fn dispatch(r: val Router, req: val Request) -> Result[MatchedRoute, HttpError] {
+pub total fn dispatch(r: val Router, req: val Request) -> Result[MatchedRoute, HttpError] {
     // Try to find a matching route.
     for rt in r.routes {
         match match_path(rt.pattern, req.path) {
@@ -819,7 +862,7 @@ partial fn accept_loop(listener: TcpListener, r: Router, dispatcher: Dispatcher)
 ///
 /// Returns "" if the filename has no extension.
 /// Pure — iterates chars; updates result on each `.`, so the last `.` wins.
-fn file_extension(p: String) -> String {
+total fn file_extension(p: String) -> String {
     let p_len: Int = p.len();
     let ext: ref String = "";
     let i: ref Int = 0;
@@ -834,7 +877,7 @@ fn file_extension(p: String) -> String {
 ///
 /// Splits on `/` and checks each segment.  Catches `/../`, `/..`, `../`
 /// and bare `..`.
-fn has_traversal(p: String) -> Bool {
+total fn has_traversal(p: String) -> Bool {
     let segs: List[String] = p.split("/");
     let found: ref Bool = false;
     for s in segs {
@@ -848,7 +891,7 @@ fn has_traversal(p: String) -> Bool {
 /// Covers HTML, CSS, JS, JSON, images, fonts, and plain text — sufficient
 /// for serving swagger-ui and common static assets.  Unknown extensions
 /// fall back to `application/octet-stream`.
-pub fn mime_type(ext: String) -> String {
+pub total fn mime_type(ext: String) -> String {
     if      ext == "html"  { "text/html; charset=utf-8" }
     else if ext == "css"   { "text/css" }
     else if ext == "js"    { "application/javascript" }
@@ -877,7 +920,7 @@ pub fn mime_type(ext: String) -> String {
 /// IFC: file contents are detainted with audit tag `"HTTP-STATIC-FILE"`.
 /// This is safe because `has_traversal` confirms the path stays within
 /// `dir_path` before the read is issued.
-pub fn serve_dir(prefix: String, dir_path: String, req: Request) -> Response ! FileRead {
+pub total fn serve_dir(prefix: String, dir_path: String, req: Request) -> Response ! FileRead {
     if !req.path.starts_with(prefix) {
         respond(Status::Http404NotFound, "")
     } else {
