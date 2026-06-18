@@ -233,8 +233,38 @@ fn hex_digit(c: String) -> Option[Int] {
     else { None }
 }
 
+// Decode a list of percent-decoded bytes as UTF-8 into a String.
+// String::from_bytes uses Latin-1 (byte → same Unicode codepoint), so for 2-byte
+// UTF-8 sequences we compute the codepoint and re-encode via Latin-1, which is
+// correct for codepoints ≤ 255 (Latin-1 and Unicode codepoints agree in that range).
+// 3/4-byte sequences (cp > 255) fall back to per-byte Latin-1 passthrough.
+fn utf8_from_bytes(bytes: List[Byte]) -> String {
+    let out: ref String = "";
+    let i: ref Int = 0;
+    let n: Int = bytes.len();
+    while i < n decreases n - i {
+        let b0: Int = match bytes.get(i) { Some(b) => b.to_int(), None => 0 };
+        i = i + 1;
+        if b0 < 128 {
+            out = out.concat(String::from_bytes([from_int(b0)]))
+        } else if b0 >= 192 && b0 < 224 && i < n {
+            let b1: Int = match bytes.get(i) { Some(b) => b.to_int(), None => 128 };
+            i = i + 1;
+            let cp: Int = (b0 - 192) * 64 + (b1 - 128);
+            if cp <= 255 {
+                out = out.concat(String::from_bytes([from_int(cp)]))
+            } else {
+                out = out.concat(String::from_bytes([from_int(b0), from_int(b1)]))
+            }
+        } else {
+            out = out.concat(String::from_bytes([from_int(b0)]))
+        }
+    }
+    out
+}
+
 fn flush_bytes(out: String, pending: List[Byte]) -> String {
-    if pending.len() == 0 { out } else { out.concat(String::from_bytes(pending)) }
+    if pending.len() == 0 { out } else { out.concat(utf8_from_bytes(pending)) }
 }
 
 /// Lenient percent-decoder for query strings (WHATWG application/x-www-form-urlencoded).
