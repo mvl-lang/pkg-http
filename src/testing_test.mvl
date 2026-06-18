@@ -4,10 +4,6 @@
 
 use testing::{parse_response, expect_status, expect_body_contains, expect_header, test_request}
 
-fn test_request_local(method: String, path: String) -> String {
-    test_request(method, path)
-}
-
 // ── test_request ────────────────────────────────────────────────────────────
 
 test fn test_request_get_health() -> Unit {

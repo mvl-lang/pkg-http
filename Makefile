@@ -1,5 +1,5 @@
 # pkg/http — HTTP types, parsing, and serialization
-.PHONY: help guard-mvl check test coverage prove assurance clean
+.PHONY: help guard-mvl check test coverage prove assurance version clean
 
 .DEFAULT_GOAL := help
 
@@ -34,6 +34,9 @@ assurance: guard-mvl ## Full assurance: check + tests + assurance report
 	$(MVL) check $(DIR)src/
 	$(MVL) test $(DIR)src/
 	$(MVL) assurance $(DIR)src/ --verbose
+
+version: ## Show current package version from mvl.toml
+	@grep '^version' mvl.toml | sed 's/version *= *"\(.*\)"/\1/'
 
 clean: ## Remove build artifacts
 	rm -rf $(TMPDIR)mvl_build_http

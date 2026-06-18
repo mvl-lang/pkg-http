@@ -4,6 +4,20 @@ All notable changes to pkg-http will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.3] - 2026-06-18
+
+### Added
+- `total fn` markers on pure enum-matching functions: `status_code`, `status_reason`, `is_success`, `is_error`, `method_name` — all are exhaustive and termination-obvious
+- Refined return type `-> Int where self >= 100 && self < 600` on `status_code` — statically declares the HTTP status code range invariant
+- `byte_value(n: Int where n >= 0 && n <= 255) -> Byte` — wraps `from_int` with an explicit range constraint; creates a real refinement proof obligation at the `utf8_from_bytes` call site (`1 proven, L1:trivial`)
+- `make coverage` — runs `mvl test --coverage` for branch coverage report
+- `make prove` — runs `mvl prove --verbose` for per-call-site refinement proof breakdown
+- Makefile `MVL` guard now falls back to `mvl` on PATH if `../../target/debug/mvl` is absent
+
+### Fixed
+- `decode_utf8_multibyte`: `%C3%A9` now correctly decodes to `é`; `String::from_bytes` uses Latin-1, so multi-byte UTF-8 sequences need codepoint arithmetic — `utf8_from_bytes` computes the codepoint and re-encodes via `byte_value`
+- `http_test.mvl` re-declares `flush_bytes` locally (workaround #96) — updated to use `utf8_from_bytes` matching the fix in `http.mvl`
+
 ## [0.2.1] - 2026-06-18
 
 ### Fixed

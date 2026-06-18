@@ -14,7 +14,7 @@ use pkg.http.{Status, Response, HttpError, status_code, http_error}
 
 /// Map a numeric status code back to a Status enum.  Unknown codes are
 /// rejected with a 400-class error.
-fn status_from_code(code: Int) -> Result[Status, HttpError] {
+total fn status_from_code(code: Int) -> Result[Status, HttpError] {
     if code == 200      { Ok(Status::Http200Ok) }
     else if code == 201 { Ok(Status::Http201Created) }
     else if code == 202 { Ok(Status::Http202Accepted) }
@@ -42,7 +42,7 @@ fn status_from_code(code: Int) -> Result[Status, HttpError] {
 // ── Request builder ──────────────────────────────────────────────────────────
 
 /// Build a raw HTTP/1.0 request string suitable for feeding into parse_request.
-pub fn test_request(method: String, path: String) -> String {
+pub total fn test_request(method: String, path: String) -> String {
     method.concat(" ").concat(path).concat(" HTTP/1.0\r\n\r\n")
 }
 
