@@ -1,0 +1,422 @@
+// pkg.http.rest tests — logic tests for REST helpers.
+//
+// Due to #96, functions from rest.mvl cannot be called directly from a test
+// file.  Following the testing_test.mvl pattern, the core logic is
+// re-implemented here and the tests exercise those local mirrors.
+//
+// Covers: HttpError constructors, json_ok_str/json_created_str/json_no_content,
+// json_escape/json_str, param_string/param_int,
+// json_get_object/json_field_string/json_field_int.
+
+use std.json.{Value, JsonError}
+
+// ── Type re-declarations (must match http.mvl exactly) ───────────────────────
+
+type Status = enum {
+    Http200Ok,
+    Http201Created,
+    Http202Accepted,
+    Http204NoContent,
+    Http301MovedPermanently,
+    Http302Found,
+    Http304NotModified,
+    Http400BadRequest,
+    Http401Unauthorized,
+    Http403Forbidden,
+    Http404NotFound,
+    Http405MethodNotAllowed,
+    Http409Conflict,
+    Http410Gone,
+    Http422UnprocessableEntity,
+    Http429TooManyRequests,
+    Http500InternalServerError,
+    Http501NotImplemented,
+    Http502BadGateway,
+    Http503ServiceUnavailable,
+    Http504GatewayTimeout,
+}
+
+type Response = struct {
+    status:  Status,
+    headers: Map[String, String],
+    body:    String,
+}
+
+type HttpError = struct {
+    status: Status,
+    detail: String,
+}
+
+type MatchedRoute = struct {
+    name:   String,
+    params: Map[String, String],
+}
+
+// ── Mirrored helpers ──────────────────────────────────────────────────────────
+
+fn status_code(s: val Status) -> Int {
+    match s {
+        Status::Http200Ok                  => 200,
+        Status::Http201Created             => 201,
+        Status::Http202Accepted            => 202,
+        Status::Http204NoContent           => 204,
+        Status::Http301MovedPermanently    => 301,
+        Status::Http302Found              => 302,
+        Status::Http304NotModified         => 304,
+        Status::Http400BadRequest          => 400,
+        Status::Http401Unauthorized        => 401,
+        Status::Http403Forbidden           => 403,
+        Status::Http404NotFound            => 404,
+        Status::Http405MethodNotAllowed    => 405,
+        Status::Http409Conflict            => 409,
+        Status::Http410Gone               => 410,
+        Status::Http422UnprocessableEntity => 422,
+        Status::Http429TooManyRequests     => 429,
+        Status::Http500InternalServerError => 500,
+        Status::Http501NotImplemented      => 501,
+        Status::Http502BadGateway          => 502,
+        Status::Http503ServiceUnavailable  => 503,
+        Status::Http504GatewayTimeout      => 504,
+    }
+}
+
+fn http_error(status: Status, detail: String) -> HttpError {
+    HttpError { status: status, detail: detail }
+}
+
+// ── Mirrored rest.mvl functions ───────────────────────────────────────────────
+
+fn http_not_found(detail: String) -> HttpError {
+    HttpError { status: Status::Http404NotFound, detail: detail }
+}
+
+fn http_bad_request(detail: String) -> HttpError {
+    HttpError { status: Status::Http400BadRequest, detail: detail }
+}
+
+fn http_unauthorized(detail: String) -> HttpError {
+    HttpError { status: Status::Http401Unauthorized, detail: detail }
+}
+
+fn http_internal_error(detail: String) -> HttpError {
+    HttpError { status: Status::Http500InternalServerError, detail: detail }
+}
+
+fn json_ok_str(body: String) -> Response {
+    Response {
+        status:  Status::Http200Ok,
+        headers: {"Content-Type": "application/json"},
+        body:    body,
+    }
+}
+
+fn json_created_str(body: String) -> Response {
+    Response {
+        status:  Status::Http201Created,
+        headers: {"Content-Type": "application/json"},
+        body:    body,
+    }
+}
+
+fn json_no_content() -> Response {
+    Response {
+        status:  Status::Http204NoContent,
+        headers: Map[String, String]::new(),
+        body:    "",
+    }
+}
+
+fn json_escape(s: String) -> String {
+    let out: ref String = "";
+    for c in s.chars() {
+        if      c == "\"" { out = out.concat("\\\"") }
+        else if c == "\\" { out = out.concat("\\\\") }
+        else if c == "\n" { out = out.concat("\\n") }
+        else if c == "\r" { out = out.concat("\\r") }
+        else if c == "\t" { out = out.concat("\\t") }
+        else              { out = out.concat(c) }
+    }
+    out
+}
+
+fn json_str(s: String) -> String {
+    "\"".concat(json_escape(s)).concat("\"")
+}
+
+fn param_string(matched: val MatchedRoute, name: String) -> Result[String, HttpError] {
+    match matched.params.get(name) {
+        None    => Err(http_bad_request("missing path param: ".concat(name))),
+        Some(v) => Ok(v),
+    }
+}
+
+fn param_int(matched: val MatchedRoute, name: String) -> Result[Int, HttpError] {
+    match param_string(matched, name) {
+        Err(e) => Err(e),
+        Ok(s)  => match s.parse_int() {
+            Err(_) => Err(http_bad_request("path param not an integer: ".concat(name))),
+            Ok(n)  => Ok(n),
+        },
+    }
+}
+
+fn json_get_object(v: Value) -> Result[Map[String, Value], HttpError] {
+    match v {
+        Value::Object(obj) => Ok(obj),
+        _                  => Err(http_bad_request("expected JSON object")),
+    }
+}
+
+fn json_field_string(obj: Map[String, Value], key: String) -> Result[String, HttpError] {
+    match obj.get(key) {
+        None                   => Err(http_bad_request("missing field: ".concat(key))),
+        Some(Value::String(s)) => Ok(s),
+        Some(_)                => Err(http_bad_request("field must be a string: ".concat(key))),
+    }
+}
+
+fn json_field_int(obj: Map[String, Value], key: String) -> Result[Int, HttpError] {
+    match obj.get(key) {
+        None                   => Err(http_bad_request("missing field: ".concat(key))),
+        Some(Value::Number(n)) => Ok(n.to_int()),
+        Some(_)                => Err(http_bad_request("field must be a number: ".concat(key))),
+    }
+}
+
+// ── HttpError constructors ────────────────────────────────────────────────────
+
+test fn http_not_found_has_404_status()        -> Unit { assert_eq(status_code(http_not_found("x").status), 404) }
+test fn http_not_found_preserves_detail()      -> Unit { assert_eq(http_not_found("item").detail, "item") }
+test fn http_bad_request_has_400_status()      -> Unit { assert_eq(status_code(http_bad_request("x").status), 400) }
+test fn http_bad_request_preserves_detail()    -> Unit { assert_eq(http_bad_request("bad").detail, "bad") }
+test fn http_unauthorized_has_401_status()     -> Unit { assert_eq(status_code(http_unauthorized("x").status), 401) }
+test fn http_unauthorized_preserves_detail()   -> Unit { assert_eq(http_unauthorized("tok").detail, "tok") }
+test fn http_internal_error_has_500_status()   -> Unit { assert_eq(status_code(http_internal_error("x").status), 500) }
+test fn http_internal_error_preserves_detail() -> Unit { assert_eq(http_internal_error("oops").detail, "oops") }
+
+// ── json_ok_str ───────────────────────────────────────────────────────────────
+
+test fn json_ok_str_has_200_status() -> Unit {
+    assert_eq(status_code(json_ok_str("{}").status), 200)
+}
+
+test fn json_ok_str_has_json_content_type() -> Unit {
+    match json_ok_str("{}").headers.get("Content-Type") {
+        None    => assert_eq(true, false),
+        Some(v) => assert_eq(v, "application/json"),
+    }
+}
+
+test fn json_ok_str_preserves_body()  -> Unit { assert_eq(json_ok_str("{\"id\":42}").body, "{\"id\":42}") }
+test fn json_ok_str_empty_body()      -> Unit { assert_eq(json_ok_str("").body, "") }
+
+// ── json_created_str ──────────────────────────────────────────────────────────
+
+test fn json_created_str_has_201_status() -> Unit {
+    assert_eq(status_code(json_created_str("{}").status), 201)
+}
+
+test fn json_created_str_has_json_content_type() -> Unit {
+    match json_created_str("{}").headers.get("Content-Type") {
+        None    => assert_eq(true, false),
+        Some(v) => assert_eq(v, "application/json"),
+    }
+}
+
+test fn json_created_str_preserves_body() -> Unit {
+    assert_eq(json_created_str("{\"name\":\"alice\"}").body, "{\"name\":\"alice\"}")
+}
+
+// ── json_no_content ───────────────────────────────────────────────────────────
+
+test fn json_no_content_has_204_status() -> Unit { assert_eq(status_code(json_no_content().status), 204) }
+test fn json_no_content_has_empty_body() -> Unit { assert_eq(json_no_content().body, "") }
+
+// ── json_escape ───────────────────────────────────────────────────────────────
+
+test fn json_escape_plain_passthrough()   -> Unit { assert_eq(json_escape("hello world"), "hello world") }
+test fn json_escape_empty_string()        -> Unit { assert_eq(json_escape(""), "") }
+test fn json_escape_double_quote()        -> Unit { assert_eq(json_escape("say \"hi\""), "say \\\"hi\\\"") }
+test fn json_escape_backslash()           -> Unit { assert_eq(json_escape("a\\b"), "a\\\\b") }
+test fn json_escape_newline()             -> Unit { assert_eq(json_escape("line1\nline2"), "line1\\nline2") }
+test fn json_escape_carriage_return()     -> Unit { assert_eq(json_escape("a\rb"), "a\\rb") }
+test fn json_escape_tab()                 -> Unit { assert_eq(json_escape("a\tb"), "a\\tb") }
+test fn json_escape_unicode_passthrough() -> Unit { assert_eq(json_escape("café"), "café") }
+
+// ── json_str ──────────────────────────────────────────────────────────────────
+
+test fn json_str_wraps_in_quotes()      -> Unit { assert_eq(json_str("hello"), "\"hello\"") }
+test fn json_str_empty_string()         -> Unit { assert_eq(json_str(""), "\"\"") }
+test fn json_str_escapes_inner_quotes() -> Unit { assert_eq(json_str("say \"hi\""), "\"say \\\"hi\\\"\"") }
+test fn json_str_escapes_backslash()    -> Unit { assert_eq(json_str("a\\b"), "\"a\\\\b\"") }
+
+// ── param_string ──────────────────────────────────────────────────────────────
+
+test fn param_string_present_returns_ok() -> Unit {
+    let m: MatchedRoute = MatchedRoute { name: "user", params: {"id": "42"} };
+    match param_string(m, "id") {
+        Err(_) => assert_eq(true, false),
+        Ok(v)  => assert_eq(v, "42"),
+    }
+}
+
+test fn param_string_absent_returns_400() -> Unit {
+    let m: MatchedRoute = MatchedRoute { name: "user", params: Map[String, String]::new() };
+    match param_string(m, "id") {
+        Ok(_)  => assert_eq(true, false),
+        Err(e) => assert_eq(status_code(e.status), 400),
+    }
+}
+
+test fn param_string_absent_error_mentions_param() -> Unit {
+    let m: MatchedRoute = MatchedRoute { name: "user", params: Map[String, String]::new() };
+    match param_string(m, "slug") {
+        Ok(_)  => assert_eq(true, false),
+        Err(e) => assert_eq(e.detail.contains("slug"), true),
+    }
+}
+
+// ── param_int ─────────────────────────────────────────────────────────────────
+
+test fn param_int_valid_integer_returns_ok() -> Unit {
+    let m: MatchedRoute = MatchedRoute { name: "item", params: {"id": "99"} };
+    match param_int(m, "id") {
+        Err(_) => assert_eq(true, false),
+        Ok(n)  => assert_eq(n, 99),
+    }
+}
+
+test fn param_int_zero_returns_ok() -> Unit {
+    let m: MatchedRoute = MatchedRoute { name: "item", params: {"n": "0"} };
+    match param_int(m, "n") {
+        Err(_) => assert_eq(true, false),
+        Ok(n)  => assert_eq(n, 0),
+    }
+}
+
+test fn param_int_negative_returns_ok() -> Unit {
+    let m: MatchedRoute = MatchedRoute { name: "item", params: {"delta": "-5"} };
+    match param_int(m, "delta") {
+        Err(_) => assert_eq(true, false),
+        Ok(n)  => assert_eq(n, -5),
+    }
+}
+
+test fn param_int_absent_returns_400() -> Unit {
+    let m: MatchedRoute = MatchedRoute { name: "item", params: Map[String, String]::new() };
+    match param_int(m, "id") {
+        Ok(_)  => assert_eq(true, false),
+        Err(e) => assert_eq(status_code(e.status), 400),
+    }
+}
+
+test fn param_int_non_numeric_returns_400() -> Unit {
+    let m: MatchedRoute = MatchedRoute { name: "item", params: {"id": "abc"} };
+    match param_int(m, "id") {
+        Ok(_)  => assert_eq(true, false),
+        Err(e) => assert_eq(status_code(e.status), 400),
+    }
+}
+
+// ── json_get_object ───────────────────────────────────────────────────────────
+
+test fn json_get_object_on_object_has_expected_field() -> Unit {
+    let v: Value = Value::Object({"key": Value::String("val")});
+    match json_get_object(v) {
+        Err(_) => assert_eq(true, false),
+        Ok(m)  => match m.get("key") {
+            None                   => assert_eq(true, false),
+            Some(Value::String(s)) => assert_eq(s, "val"),
+            Some(_)                => assert_eq(true, false),
+        },
+    }
+}
+
+test fn json_get_object_on_string_returns_400() -> Unit {
+    match json_get_object(Value::String("not an object")) {
+        Ok(_)  => assert_eq(true, false),
+        Err(e) => assert_eq(status_code(e.status), 400),
+    }
+}
+
+test fn json_get_object_on_number_returns_400() -> Unit {
+    match json_get_object(Value::Number(3.14)) {
+        Ok(_)  => assert_eq(true, false),
+        Err(e) => assert_eq(status_code(e.status), 400),
+    }
+}
+
+test fn json_get_object_on_null_returns_400() -> Unit {
+    match json_get_object(Value::Null) {
+        Ok(_)  => assert_eq(true, false),
+        Err(e) => assert_eq(status_code(e.status), 400),
+    }
+}
+
+// ── json_field_string ─────────────────────────────────────────────────────────
+
+test fn json_field_string_present_returns_ok() -> Unit {
+    let obj: Map[String, Value] = {"name": Value::String("alice")};
+    match json_field_string(obj, "name") {
+        Err(_) => assert_eq(true, false),
+        Ok(s)  => assert_eq(s, "alice"),
+    }
+}
+
+test fn json_field_string_missing_returns_400() -> Unit {
+    let obj: Map[String, Value] = Map[String, Value]::new();
+    match json_field_string(obj, "name") {
+        Ok(_)  => assert_eq(true, false),
+        Err(e) => assert_eq(status_code(e.status), 400),
+    }
+}
+
+test fn json_field_string_wrong_type_returns_400() -> Unit {
+    let obj: Map[String, Value] = {"count": Value::Number(5.0)};
+    match json_field_string(obj, "count") {
+        Ok(_)  => assert_eq(true, false),
+        Err(e) => assert_eq(status_code(e.status), 400),
+    }
+}
+
+test fn json_field_string_error_mentions_key() -> Unit {
+    let obj: Map[String, Value] = Map[String, Value]::new();
+    match json_field_string(obj, "email") {
+        Ok(_)  => assert_eq(true, false),
+        Err(e) => assert_eq(e.detail.contains("email"), true),
+    }
+}
+
+// ── json_field_int ────────────────────────────────────────────────────────────
+
+test fn json_field_int_present_returns_ok() -> Unit {
+    let obj: Map[String, Value] = {"age": Value::Number(30.0)};
+    match json_field_int(obj, "age") {
+        Err(_) => assert_eq(true, false),
+        Ok(n)  => assert_eq(n, 30),
+    }
+}
+
+test fn json_field_int_missing_returns_400() -> Unit {
+    let obj: Map[String, Value] = Map[String, Value]::new();
+    match json_field_int(obj, "age") {
+        Ok(_)  => assert_eq(true, false),
+        Err(e) => assert_eq(status_code(e.status), 400),
+    }
+}
+
+test fn json_field_int_wrong_type_returns_400() -> Unit {
+    let obj: Map[String, Value] = {"age": Value::String("thirty")};
+    match json_field_int(obj, "age") {
+        Ok(_)  => assert_eq(true, false),
+        Err(e) => assert_eq(status_code(e.status), 400),
+    }
+}
+
+test fn json_field_int_float_truncated_to_int() -> Unit {
+    let obj: Map[String, Value] = {"score": Value::Number(7.9)};
+    match json_field_int(obj, "score") {
+        Err(_) => assert_eq(true, false),
+        Ok(n)  => assert_eq(n, 7),
+    }
+}

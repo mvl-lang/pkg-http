@@ -51,7 +51,7 @@ pub fn test_request(method: String, path: String) -> String {
 /// Parse a raw HTTP/1.x response string into a Response.
 ///
 /// Inverse of serialize_response — enables round-trip testing.
-pub fn parse_response(raw: String) -> Result[Response, HttpError] {
+pub partial fn parse_response(raw: String) -> Result[Response, HttpError] {
     let lines: List[String] = raw.split("\r\n");
     let status_line: String = match lines.get(0) {
         Some(s) => s,
@@ -99,17 +99,12 @@ partial fn parse_rest(lines: List[String], status: Status) -> Response {
         }
     }
 
-    let body: ref String = "";
-    let j:    ref Int    = body_start;
-    let first: ref Bool  = true;
+    let body: ref String = match lines.get(body_start) { Some(s) => s, None => "" };
+    let j:    ref Int    = body_start + 1;
     while j < n {
         let line: String = match lines.get(j) { Some(s) => s, None => "" };
-        if first {
-            body = line;
-            first = false
-        } else {
-            body = body.concat("\r\n").concat(line)
-        }
+        body = body.concat("\r\n");
+        body = body.concat(line);
         j = j + 1
     }
 
@@ -119,7 +114,7 @@ partial fn parse_rest(lines: List[String], status: Status) -> Response {
 // ── BDD-style assertion helpers ──────────────────────────────────────────────
 
 /// True if the raw response's status code equals `expected`.
-pub fn expect_status(raw: String, expected: Status) -> Bool {
+pub partial fn expect_status(raw: String, expected: Status) -> Bool {
     match parse_response(raw) {
         Ok(r)  => status_code(r.status) == status_code(expected),
         Err(_) => false,
@@ -127,7 +122,7 @@ pub fn expect_status(raw: String, expected: Status) -> Bool {
 }
 
 /// True if the raw response's body contains `expected` as a substring.
-pub fn expect_body_contains(raw: String, expected: String) -> Bool {
+pub partial fn expect_body_contains(raw: String, expected: String) -> Bool {
     match parse_response(raw) {
         Ok(r)  => r.body.contains(expected),
         Err(_) => false,
@@ -135,7 +130,7 @@ pub fn expect_body_contains(raw: String, expected: String) -> Bool {
 }
 
 /// True if the raw response contains a header `key: value`.
-pub fn expect_header(raw: String, key: String, value: String) -> Bool {
+pub partial fn expect_header(raw: String, key: String, value: String) -> Bool {
     match parse_response(raw) {
         Ok(r)  => match r.headers.get(key) {
             Some(v) => v == value,

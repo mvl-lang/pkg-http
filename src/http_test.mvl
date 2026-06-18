@@ -1135,3 +1135,64 @@ test fn mime_woff2() -> Unit { assert_eq(mime_type("woff2"), "font/woff2") }
 test fn mime_woff()  -> Unit { assert_eq(mime_type("woff"),  "font/woff") }
 test fn mime_unknown() -> Unit { assert_eq(mime_type("xyz"), "application/octet-stream") }
 test fn mime_empty()   -> Unit { assert_eq(mime_type(""),    "application/octet-stream") }
+
+// ── status_code: missing variants ────────────────────────────────────────────
+
+test fn code_202() -> Unit { assert_eq(status_code(Status::Http202Accepted), 202) }
+test fn code_302() -> Unit { assert_eq(status_code(Status::Http302Found), 302) }
+test fn code_304() -> Unit { assert_eq(status_code(Status::Http304NotModified), 304) }
+test fn code_410() -> Unit { assert_eq(status_code(Status::Http410Gone), 410) }
+test fn code_501() -> Unit { assert_eq(status_code(Status::Http501NotImplemented), 501) }
+
+// ── status_reason: full coverage ─────────────────────────────────────────────
+
+test fn reason_201() -> Unit { assert_eq(status_reason(Status::Http201Created), "Created") }
+test fn reason_202() -> Unit { assert_eq(status_reason(Status::Http202Accepted), "Accepted") }
+test fn reason_204() -> Unit { assert_eq(status_reason(Status::Http204NoContent), "No Content") }
+test fn reason_301() -> Unit { assert_eq(status_reason(Status::Http301MovedPermanently), "Moved Permanently") }
+test fn reason_302() -> Unit { assert_eq(status_reason(Status::Http302Found), "Found") }
+test fn reason_304() -> Unit { assert_eq(status_reason(Status::Http304NotModified), "Not Modified") }
+test fn reason_400() -> Unit { assert_eq(status_reason(Status::Http400BadRequest), "Bad Request") }
+test fn reason_401() -> Unit { assert_eq(status_reason(Status::Http401Unauthorized), "Unauthorized") }
+test fn reason_403() -> Unit { assert_eq(status_reason(Status::Http403Forbidden), "Forbidden") }
+test fn reason_405() -> Unit { assert_eq(status_reason(Status::Http405MethodNotAllowed), "Method Not Allowed") }
+test fn reason_409() -> Unit { assert_eq(status_reason(Status::Http409Conflict), "Conflict") }
+test fn reason_410() -> Unit { assert_eq(status_reason(Status::Http410Gone), "Gone") }
+test fn reason_422() -> Unit { assert_eq(status_reason(Status::Http422UnprocessableEntity), "Unprocessable Entity") }
+test fn reason_429() -> Unit { assert_eq(status_reason(Status::Http429TooManyRequests), "Too Many Requests") }
+test fn reason_501() -> Unit { assert_eq(status_reason(Status::Http501NotImplemented), "Not Implemented") }
+test fn reason_502() -> Unit { assert_eq(status_reason(Status::Http502BadGateway), "Bad Gateway") }
+test fn reason_503() -> Unit { assert_eq(status_reason(Status::Http503ServiceUnavailable), "Service Unavailable") }
+test fn reason_504() -> Unit { assert_eq(status_reason(Status::Http504GatewayTimeout), "Gateway Timeout") }
+
+// ── method_name ───────────────────────────────────────────────────────────────
+
+test fn method_name_get()     -> Unit { assert_eq(method_name(Method::Get),     "GET") }
+test fn method_name_post()    -> Unit { assert_eq(method_name(Method::Post),    "POST") }
+test fn method_name_put()     -> Unit { assert_eq(method_name(Method::Put),     "PUT") }
+test fn method_name_delete()  -> Unit { assert_eq(method_name(Method::Delete),  "DELETE") }
+test fn method_name_patch()   -> Unit { assert_eq(method_name(Method::Patch),   "PATCH") }
+test fn method_name_head()    -> Unit { assert_eq(method_name(Method::Head),    "HEAD") }
+test fn method_name_options() -> Unit { assert_eq(method_name(Method::Options), "OPTIONS") }
+
+// ── created() response builder ────────────────────────────────────────────────
+
+test fn created_response_has_201_status() -> Unit {
+    let r: Response = created("body");
+    assert_eq(status_code(r.status), 201)
+}
+
+test fn created_response_preserves_body() -> Unit {
+    let r: Response = created("the body");
+    assert_eq(r.body, "the body")
+}
+
+// ── is_success / is_error: edge cases ────────────────────────────────────────
+
+test fn accepted_is_success()        -> Unit { assert_eq(is_success(Status::Http202Accepted), true) }
+test fn no_content_is_success()      -> Unit { assert_eq(is_success(Status::Http204NoContent), true) }
+test fn redirect_is_not_success()    -> Unit { assert_eq(is_success(Status::Http301MovedPermanently), false) }
+test fn unauthorized_is_error()      -> Unit { assert_eq(is_error(Status::Http401Unauthorized), true) }
+test fn not_found_is_error()         -> Unit { assert_eq(is_error(Status::Http404NotFound), true) }
+test fn redirect_is_not_error()      -> Unit { assert_eq(is_error(Status::Http301MovedPermanently), false) }
+

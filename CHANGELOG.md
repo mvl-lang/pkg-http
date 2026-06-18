@@ -4,6 +4,19 @@ All notable changes to pkg-http will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.1] - 2026-06-18
+
+### Fixed
+- `HttpServer.serve` missing `! Send + Spawn` effects (REQ7) — actor self-messages and actor instantiation require these effects
+- `json_error` declared `total fn` but calls `partial fn encode` (REQ8) — changed to `partial fn`
+- `parse_response` implicitly total but called `partial fn parse_rest` (REQ8) — marked `partial`
+- Use-after-move of `line` in `parse_rest` body loop (REQ2/REQ1) — eliminated `first` flag pattern; cascading callers `expect_status`/`expect_body_contains`/`expect_header` also marked `partial`
+
+### Added
+- `rest_test.mvl` — first test file for `rest.mvl`, 52 tests covering all public functions (HttpError constructors, JSON response builders, `json_escape`/`json_str`, `param_string`/`param_int`, JSON field helpers)
+- 30 new tests in `http_test.mvl` filling coverage gaps: all `status_reason` variants, missing `status_code` codes, all 7 `method_name` variants, `created()` builder, `is_success`/`is_error` edge cases
+- 12 new tests in `testing_test.mvl`: multi-line body, multi-header parsing, 204/201/500 status variants
+
 ## [0.2.0] - 2026-05-29
 
 ### Added

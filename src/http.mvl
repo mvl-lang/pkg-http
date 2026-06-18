@@ -729,7 +729,7 @@ pub actor HttpServer {
     router:   Router,
 
     /// Accept one connection, spawn a `ConnectionHandler`, then re-enqueue self.
-    pub fn serve() ! Net + Console {
+    pub fn serve() ! Net + Console + Send + Spawn {
         match tcp_accept(self.listener) {
             Err(NetError::ConnectionReset) => self.serve(),
             Err(NetError::Timeout)         => self.serve(),
