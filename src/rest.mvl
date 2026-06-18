@@ -10,6 +10,7 @@
 //                  param_int, param_string, body_json,
 //                  json_field_string, json_field_int}
 
+use pkg.http.{Status, Response, HttpError, MatchedRoute, Request, http_error}
 use std.json.{Value, encode, decode, JsonError}
 
 // ── HttpError constructors ────────────────────────────────────────────────────
@@ -55,7 +56,7 @@ pub fn json_no_content() -> Response {
 }
 
 /// Error response: `{"error": "<detail>"}` with the HttpError's status code.
-pub total fn json_error(e: val HttpError) -> Response {
+pub partial fn json_error(e: val HttpError) -> Response {
     let body: Value = Value::Object({"error": Value::String(e.detail)});
     Response {
         status:  e.status,
