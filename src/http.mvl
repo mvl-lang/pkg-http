@@ -3,7 +3,7 @@
 // Built on std.net primitives.  No extern blocks.
 //
 // Import (types + parsing):
-//   use pkg.http.{Status, Method, Request, Response, HttpError,
+//   use pkg.http.{HttpStatus, Method, Request, Response, HttpError,
 //                  parse_request, serialize_response, respond, error_response,
 //                  query_first, query_all}
 //
@@ -23,13 +23,13 @@ use std.net.{TcpListener, TcpStream, NetError,
 
 use std.collections.{}
 
-// ── Status ────────────────────────────────────────────────────────────────────
+// ── HttpStatus ────────────────────────────────────────────────────────────────────
 /// HTTP status code as a type-safe enum.
 ///
 /// Each variant encodes the status class (2xx/3xx/4xx/5xx) and meaning.
 /// Use status_code() to extract the numeric value, status_reason() for the
 /// reason phrase.
-pub type Status = enum {
+pub type HttpStatus = enum {
     Http200Ok,
     Http201Created,
     Http202Accepted,
@@ -61,61 +61,61 @@ pub type Status = enum {
 ///
 /// Refined return type `[100, 600)` is statically declared — every enum variant maps
 /// to a constant that the checker can verify satisfies the bound without a wrapper call.
-pub total fn status_code(s: val Status) -> Int where self >= 100 && self < 600 {
+pub total fn status_code(s: val HttpStatus) -> Int where self >= 100 && self < 600 {
     match s {
-        Status::Http200Ok => 200,
-        Status::Http201Created => 201,
-        Status::Http202Accepted => 202,
-        Status::Http204NoContent => 204,
-        Status::Http301MovedPermanently => 301,
-        Status::Http302Found => 302,
-        Status::Http304NotModified => 304,
-        Status::Http400BadRequest => 400,
-        Status::Http401Unauthorized => 401,
-        Status::Http403Forbidden => 403,
-        Status::Http404NotFound => 404,
-        Status::Http405MethodNotAllowed => 405,
-        Status::Http409Conflict => 409,
-        Status::Http410Gone => 410,
-        Status::Http422UnprocessableEntity => 422,
-        Status::Http429TooManyRequests => 429,
-        Status::Http500InternalServerError => 500,
-        Status::Http501NotImplemented => 501,
-        Status::Http502BadGateway => 502,
-        Status::Http503ServiceUnavailable => 503,
-        Status::Http504GatewayTimeout => 504,
+        HttpStatus::Http200Ok => 200,
+        HttpStatus::Http201Created => 201,
+        HttpStatus::Http202Accepted => 202,
+        HttpStatus::Http204NoContent => 204,
+        HttpStatus::Http301MovedPermanently => 301,
+        HttpStatus::Http302Found => 302,
+        HttpStatus::Http304NotModified => 304,
+        HttpStatus::Http400BadRequest => 400,
+        HttpStatus::Http401Unauthorized => 401,
+        HttpStatus::Http403Forbidden => 403,
+        HttpStatus::Http404NotFound => 404,
+        HttpStatus::Http405MethodNotAllowed => 405,
+        HttpStatus::Http409Conflict => 409,
+        HttpStatus::Http410Gone => 410,
+        HttpStatus::Http422UnprocessableEntity => 422,
+        HttpStatus::Http429TooManyRequests => 429,
+        HttpStatus::Http500InternalServerError => 500,
+        HttpStatus::Http501NotImplemented => 501,
+        HttpStatus::Http502BadGateway => 502,
+        HttpStatus::Http503ServiceUnavailable => 503,
+        HttpStatus::Http504GatewayTimeout => 504,
     }
 }
 
 /// Extract the reason phrase.
-pub total fn status_reason(s: val Status) -> String {
+pub total fn status_reason(s: val HttpStatus) -> String {
     match s {
-        Status::Http200Ok => "OK",
-        Status::Http201Created => "Created",
-        Status::Http202Accepted => "Accepted",
-        Status::Http204NoContent => "No Content",
-        Status::Http301MovedPermanently => "Moved Permanently",
-        Status::Http302Found => "Found",
-        Status::Http304NotModified => "Not Modified",
-        Status::Http400BadRequest => "Bad Request",
-        Status::Http401Unauthorized => "Unauthorized",
-        Status::Http403Forbidden => "Forbidden",
-        Status::Http404NotFound => "Not Found",
-        Status::Http405MethodNotAllowed => "Method Not Allowed",
-        Status::Http409Conflict => "Conflict",
-        Status::Http410Gone => "Gone",
-        Status::Http422UnprocessableEntity => "Unprocessable Entity",
-        Status::Http429TooManyRequests => "Too Many Requests",
-        Status::Http500InternalServerError => "Internal Server Error",
-        Status::Http501NotImplemented => "Not Implemented",
-        Status::Http502BadGateway => "Bad Gateway",
-        Status::Http503ServiceUnavailable => "Service Unavailable",
-        Status::Http504GatewayTimeout => "Gateway Timeout",
+        HttpStatus::Http200Ok => "OK",
+        HttpStatus::Http201Created => "Created",
+        HttpStatus::Http202Accepted => "Accepted",
+        HttpStatus::Http204NoContent => "No Content",
+        HttpStatus::Http301MovedPermanently => "Moved Permanently",
+        HttpStatus::Http302Found => "Found",
+        HttpStatus::Http304NotModified => "Not Modified",
+        HttpStatus::Http400BadRequest => "Bad Request",
+        HttpStatus::Http401Unauthorized => "Unauthorized",
+        HttpStatus::Http403Forbidden => "Forbidden",
+        HttpStatus::Http404NotFound => "Not Found",
+        HttpStatus::Http405MethodNotAllowed => "Method Not Allowed",
+        HttpStatus::Http409Conflict => "Conflict",
+        HttpStatus::Http410Gone => "Gone",
+        HttpStatus::Http422UnprocessableEntity => "Unprocessable Entity",
+        HttpStatus::Http429TooManyRequests => "Too Many Requests",
+        HttpStatus::Http500InternalServerError => "Internal Server Error",
+        HttpStatus::Http501NotImplemented => "Not Implemented",
+        HttpStatus::Http502BadGateway => "Bad Gateway",
+        HttpStatus::Http503ServiceUnavailable => "Service Unavailable",
+        HttpStatus::Http504GatewayTimeout => "Gateway Timeout",
     }
 }
 
 /// True for 2xx status codes.
-pub total fn is_success(s: val Status) -> Bool {
+pub total fn is_success(s: val HttpStatus) -> Bool {
     let code: Int = status_code(s);
     if code >= 200 {
         code < 300
@@ -125,7 +125,7 @@ pub total fn is_success(s: val Status) -> Bool {
 }
 
 /// True for 4xx and 5xx status codes.
-pub total fn is_error(s: val Status) -> Bool { status_code(s) >= 400 }
+pub total fn is_error(s: val HttpStatus) -> Bool { status_code(s) >= 400 }
 
 // ── Method ────────────────────────────────────────────────────────────────────
 /// HTTP request method.
@@ -158,7 +158,7 @@ pub type Request = struct {
 
 /// HTTP response.
 pub type Response = struct {
-    status: Status,
+    status: HttpStatus,
     headers: Map[String, String],
     body: String,
 }
@@ -168,7 +168,7 @@ pub type Response = struct {
 /// Analogous to FastAPI's HTTPException(status_code, detail).
 /// Use http_error() to construct, error_response() to convert to a Response.
 pub type HttpError = struct {
-    status: Status,
+    status: HttpStatus,
     detail: String,
 }
 
@@ -180,7 +180,7 @@ total fn require(
 ) -> Result[String, HttpError] {
     match opt {
         Some(v) => Ok(v),
-        None => Err(HttpError { status: Status::Http400BadRequest, detail: msg }),
+        None => Err(HttpError { status: HttpStatus::Http400BadRequest, detail: msg }),
     }
 }
 
@@ -216,7 +216,7 @@ pub total fn parse_method(s: String) -> Result[Method, HttpError] {
     } else if s == "OPTIONS" {
         Ok(Method::Options)
     } else {
-        Err(HttpError { status: Status::Http400BadRequest, detail: "unknown HTTP method" })
+        Err(HttpError { status: HttpStatus::Http400BadRequest, detail: "unknown HTTP method" })
     }
 }
 
@@ -669,7 +669,7 @@ pub total fn serialize_response(resp: val Response) -> String {
 // ── Constructors ──────────────────────────────────────────────────────────────
 /// Build a Response from a status and body.
 pub total fn respond(
-    status: Status,
+    status: HttpStatus,
     body: String,
 ) -> Response {
     Response { status: status, headers: {"Content-Type": "text/plain"}, body: body }
@@ -680,20 +680,20 @@ pub total fn error_response(e: val HttpError) -> Response { respond(e.status, e.
 
 /// Build an HttpError.
 pub total fn http_error(
-    status: Status,
+    status: HttpStatus,
     detail: String,
 ) -> HttpError {
     HttpError { status: status, detail: detail }
 }
 
 /// 200 OK with a text/plain body.
-pub total fn ok(body: String) -> Response { respond(Status::Http200Ok, body) }
+pub total fn ok(body: String) -> Response { respond(HttpStatus::Http200Ok, body) }
 
 /// 201 Created with a text/plain body.
-pub total fn created(body: String) -> Response { respond(Status::Http201Created, body) }
+pub total fn created(body: String) -> Response { respond(HttpStatus::Http201Created, body) }
 
 /// 404 Not Found with empty body.
-pub total fn not_found() -> Response { respond(Status::Http404NotFound, "") }
+pub total fn not_found() -> Response { respond(HttpStatus::Http404NotFound, "") }
 
 // ── Router ────────────────────────────────────────────────────────────────────
 /// A named route: HTTP method + URL pattern + handler name.
@@ -804,9 +804,9 @@ pub total fn dispatch(
         }
     }
     if path_matched {
-        Err(HttpError { status: Status::Http405MethodNotAllowed, detail: "method not allowed" })
+        Err(HttpError { status: HttpStatus::Http405MethodNotAllowed, detail: "method not allowed" })
     } else {
-        Err(HttpError { status: Status::Http404NotFound, detail: req.path })
+        Err(HttpError { status: HttpStatus::Http404NotFound, detail: req.path })
     }
 }
 
@@ -906,7 +906,7 @@ partial fn accept_loop(
         Err(_) => Ok(()),
         Ok(stream) => {
             let resp: Response = match tcp_read_request(stream) {
-                Err(_) => error_response(HttpError { status: Status::Http500InternalServerError, detail: "read error" }),
+                Err(_) => error_response(HttpError { status: HttpStatus::Http500InternalServerError, detail: "read error" }),
                 Ok(raw) => match parse_request(raw) {
                     Err(e) => error_response(e),
                     Ok(req) => match dispatch(r, req) {
@@ -1025,13 +1025,13 @@ pub total fn serve_dir(
     req: Request,
 ) -> Response ! FileRead {
     if !req.path.starts_with(prefix) {
-        respond(Status::Http404NotFound, "")
+        respond(HttpStatus::Http404NotFound, "")
     } else {
         let prefix_len: Int = prefix.len();
         let path_len: Int = req.path.len();
         let rel: String = req.path.substring(prefix_len, path_len);
         if has_traversal(rel) {
-            respond(Status::Http403Forbidden, "forbidden")
+            respond(HttpStatus::Http403Forbidden, "forbidden")
         } else {
             let with_index: String = if rel.len() == 0 || rel.ends_with("/") {
                 rel.concat("index.html")
@@ -1041,13 +1041,13 @@ pub total fn serve_dir(
             } else { with_index };
             let file_path: String = dir_path.concat("/").concat(rel_clean);
             match read_file(file_path) {
-                Err(IoError::NotFound) => respond(Status::Http404NotFound, ""),
-                Err(IoError::PermissionDenied) => respond(Status::Http403Forbidden, "forbidden"),
-                Err(_) => respond(Status::Http500InternalServerError, "read error"),
+                Err(IoError::NotFound) => respond(HttpStatus::Http404NotFound, ""),
+                Err(IoError::PermissionDenied) => respond(HttpStatus::Http403Forbidden, "forbidden"),
+                Err(_) => respond(HttpStatus::Http500InternalServerError, "read error"),
                 Ok(raw) => {
                     let content: String = relabel trust(raw, "HTTP-STATIC-FILE");
                     let ct: String = mime_type(file_extension(rel_clean));
-                    Response { status: Status::Http200Ok, headers: {"Content-Type": ct}, body: content }
+                    Response { status: HttpStatus::Http200Ok, headers: {"Content-Type": ct}, body: content }
                 },
             }
         }
@@ -1068,13 +1068,13 @@ pub partial fn serve(
 ) -> Result[Unit, HttpError] ! Net + Console {
     let parts: List[String] = addr.split(":");
     match parts.get(0) {
-        None => Err(HttpError { status: Status::Http400BadRequest, detail: "invalid addr: missing host" }),
+        None => Err(HttpError { status: HttpStatus::Http400BadRequest, detail: "invalid addr: missing host" }),
         Some(host) => match parts.get(1) {
-            None => Err(HttpError { status: Status::Http400BadRequest, detail: "invalid addr: missing port" }),
+            None => Err(HttpError { status: HttpStatus::Http400BadRequest, detail: "invalid addr: missing port" }),
             Some(port_str) => match port_str.parse_int() {
-                Err(_) => Err(HttpError { status: Status::Http400BadRequest, detail: "invalid addr: bad port" }),
+                Err(_) => Err(HttpError { status: HttpStatus::Http400BadRequest, detail: "invalid addr: bad port" }),
                 Ok(port) => match tcp_listen(host, port) {
-                    Err(e) => Err(HttpError { status: Status::Http503ServiceUnavailable, detail: net_error_msg(e) }),
+                    Err(e) => Err(HttpError { status: HttpStatus::Http503ServiceUnavailable, detail: net_error_msg(e) }),
                     Ok(listener) => accept_loop(listener, r, dispatcher),
                 },
             },

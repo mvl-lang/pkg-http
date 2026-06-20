@@ -7,56 +7,56 @@
 //                 expect_body_contains, expect_header}
 //
 // See #951.
-use pkg.http.{Status, Response, HttpError, status_code, http_error}
+use pkg.http.{HttpStatus, Response, HttpError, status_code, http_error}
 
-// ── Status reconstruction ────────────────────────────────────────────────────
-/// Map a numeric status code back to a Status enum.  Unknown codes are
+// ── HttpStatus reconstruction ────────────────────────────────────────────────────
+/// Map a numeric status code back to a HttpStatus enum.  Unknown codes are
 /// rejected with a 400-class error.
-total fn status_from_code(code: Int) -> Result[Status, HttpError] {
+total fn status_from_code(code: Int) -> Result[HttpStatus, HttpError] {
     if code == 200 {
-        Ok(Status::Http200Ok)
+        Ok(HttpStatus::Http200Ok)
     } else if code == 201 {
-        Ok(Status::Http201Created)
+        Ok(HttpStatus::Http201Created)
     } else if code == 202 {
-        Ok(Status::Http202Accepted)
+        Ok(HttpStatus::Http202Accepted)
     } else if code == 204 {
-        Ok(Status::Http204NoContent)
+        Ok(HttpStatus::Http204NoContent)
     } else if code == 301 {
-        Ok(Status::Http301MovedPermanently)
+        Ok(HttpStatus::Http301MovedPermanently)
     } else if code == 302 {
-        Ok(Status::Http302Found)
+        Ok(HttpStatus::Http302Found)
     } else if code == 304 {
-        Ok(Status::Http304NotModified)
+        Ok(HttpStatus::Http304NotModified)
     } else if code == 400 {
-        Ok(Status::Http400BadRequest)
+        Ok(HttpStatus::Http400BadRequest)
     } else if code == 401 {
-        Ok(Status::Http401Unauthorized)
+        Ok(HttpStatus::Http401Unauthorized)
     } else if code == 403 {
-        Ok(Status::Http403Forbidden)
+        Ok(HttpStatus::Http403Forbidden)
     } else if code == 404 {
-        Ok(Status::Http404NotFound)
+        Ok(HttpStatus::Http404NotFound)
     } else if code == 405 {
-        Ok(Status::Http405MethodNotAllowed)
+        Ok(HttpStatus::Http405MethodNotAllowed)
     } else if code == 409 {
-        Ok(Status::Http409Conflict)
+        Ok(HttpStatus::Http409Conflict)
     } else if code == 410 {
-        Ok(Status::Http410Gone)
+        Ok(HttpStatus::Http410Gone)
     } else if code == 422 {
-        Ok(Status::Http422UnprocessableEntity)
+        Ok(HttpStatus::Http422UnprocessableEntity)
     } else if code == 429 {
-        Ok(Status::Http429TooManyRequests)
+        Ok(HttpStatus::Http429TooManyRequests)
     } else if code == 500 {
-        Ok(Status::Http500InternalServerError)
+        Ok(HttpStatus::Http500InternalServerError)
     } else if code == 501 {
-        Ok(Status::Http501NotImplemented)
+        Ok(HttpStatus::Http501NotImplemented)
     } else if code == 502 {
-        Ok(Status::Http502BadGateway)
+        Ok(HttpStatus::Http502BadGateway)
     } else if code == 503 {
-        Ok(Status::Http503ServiceUnavailable)
+        Ok(HttpStatus::Http503ServiceUnavailable)
     } else if code == 504 {
-        Ok(Status::Http504GatewayTimeout)
+        Ok(HttpStatus::Http504GatewayTimeout)
     } else {
-        Err(http_error(Status::Http400BadRequest, "unknown status code"))
+        Err(http_error(HttpStatus::Http400BadRequest, "unknown status code"))
     }
 }
 
@@ -80,18 +80,18 @@ pub partial fn parse_response(raw: String) -> Result[Response, HttpError] {
         None => "",
     };
     if status_line == "" {
-        Err(http_error(Status::Http400BadRequest, "empty response"))
+        Err(http_error(HttpStatus::Http400BadRequest, "empty response"))
     } else {
         let parts: List[String] = status_line.split(" ");
         if parts.len() < 3 {
-            Err(http_error(Status::Http400BadRequest, "malformed status line"))
+            Err(http_error(HttpStatus::Http400BadRequest, "malformed status line"))
         } else {
             let code_str: String = match parts.get(1) {
                 Some(s) => s,
                 None => "",
             };
             match code_str.parse_int() {
-                Err(_) => Err(http_error(Status::Http400BadRequest, "non-numeric status code")),
+                Err(_) => Err(http_error(HttpStatus::Http400BadRequest, "non-numeric status code")),
                 Ok(code) => match status_from_code(code) {
                     Err(e) => Err(e),
                     Ok(status) => Ok(parse_rest(lines, status)),
@@ -104,7 +104,7 @@ pub partial fn parse_response(raw: String) -> Result[Response, HttpError] {
 /// Parse headers + body given the lines (after status line) and the status enum.
 partial fn parse_rest(
     lines: List[String],
-    status: Status,
+    status: HttpStatus,
 ) -> Response {
     let headers: ref Map[String, String] = Map::new();
     let i: ref Int = 1;
@@ -154,7 +154,7 @@ partial fn parse_rest(
 /// True if the raw response's status code equals `expected`.
 pub partial fn expect_status(
     raw: String,
-    expected: Status,
+    expected: HttpStatus,
 ) -> Bool {
     match parse_response(raw) {
         Ok(r) => status_code(r.status) == status_code(expected),

@@ -1,11 +1,9 @@
 // pkg.http.testing tests — response parsing and BDD assertion helpers.
 //
 // All functions here are pure (no effects).
-
 use testing::{parse_response, expect_status, expect_body_contains, expect_header, test_request}
 
 // ── test_request ────────────────────────────────────────────────────────────
-
 test fn test_request_get_health() -> Unit {
     assert_eq(test_request("GET", "/health"), "GET /health HTTP/1.0\r\n\r\n")
 }
@@ -15,11 +13,10 @@ test fn test_request_post_users() -> Unit {
 }
 
 // ── parse_response ──────────────────────────────────────────────────────────
-
 test fn parse_response_status_200() -> Unit {
     let raw: String = "HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok";
     match parse_response(raw) {
-        Ok(r)  => assert_eq(status_code(r.status), 200),
+        Ok(r) => assert_eq(status_code(r.status), 200),
         Err(_) => assert_eq(true, false),
     }
 }
@@ -27,7 +24,7 @@ test fn parse_response_status_200() -> Unit {
 test fn parse_response_status_404() -> Unit {
     let raw: String = "HTTP/1.0 404 Not Found\r\nContent-Length: 0\r\n\r\n";
     match parse_response(raw) {
-        Ok(r)  => assert_eq(status_code(r.status), 404),
+        Ok(r) => assert_eq(status_code(r.status), 404),
         Err(_) => assert_eq(true, false),
     }
 }
@@ -35,9 +32,9 @@ test fn parse_response_status_404() -> Unit {
 test fn parse_response_extracts_header() -> Unit {
     let raw: String = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nok";
     match parse_response(raw) {
-        Ok(r)  => match r.headers.get("Content-Type") {
+        Ok(r) => match r.headers.get("Content-Type") {
             Some(v) => assert_eq(v, "text/plain"),
-            None    => assert_eq(true, false),
+            None => assert_eq(true, false),
         },
         Err(_) => assert_eq(true, false),
     }
@@ -46,7 +43,7 @@ test fn parse_response_extracts_header() -> Unit {
 test fn parse_response_extracts_body() -> Unit {
     let raw: String = "HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nhello";
     match parse_response(raw) {
-        Ok(r)  => assert_eq(r.body, "hello"),
+        Ok(r) => assert_eq(r.body, "hello"),
         Err(_) => assert_eq(true, false),
     }
 }
@@ -54,57 +51,55 @@ test fn parse_response_extracts_body() -> Unit {
 test fn parse_response_empty_body() -> Unit {
     let raw: String = "HTTP/1.0 404 Not Found\r\nContent-Length: 0\r\n\r\n";
     match parse_response(raw) {
-        Ok(r)  => assert_eq(r.body, ""),
+        Ok(r) => assert_eq(r.body, ""),
         Err(_) => assert_eq(true, false),
     }
 }
 
 test fn parse_response_rejects_empty() -> Unit {
     match parse_response("") {
-        Ok(_)  => assert_eq(true, false),
+        Ok(_) => assert_eq(true, false),
         Err(e) => assert_eq(status_code(e.status), 400),
     }
 }
 
 test fn parse_response_rejects_malformed_status_line() -> Unit {
     match parse_response("HTTP/1.0 200\r\n\r\n") {
-        Ok(_)  => assert_eq(true, false),
+        Ok(_) => assert_eq(true, false),
         Err(e) => assert_eq(status_code(e.status), 400),
     }
 }
 
 test fn parse_response_rejects_non_numeric_status() -> Unit {
     match parse_response("HTTP/1.0 NaN OK\r\n\r\n") {
-        Ok(_)  => assert_eq(true, false),
+        Ok(_) => assert_eq(true, false),
         Err(e) => assert_eq(status_code(e.status), 400),
     }
 }
 
 test fn parse_response_rejects_unknown_status_code() -> Unit {
     match parse_response("HTTP/1.0 999 Wat\r\n\r\n") {
-        Ok(_)  => assert_eq(true, false),
+        Ok(_) => assert_eq(true, false),
         Err(e) => assert_eq(status_code(e.status), 400),
     }
 }
 
 // ── expect_status ───────────────────────────────────────────────────────────
-
 test fn expect_status_matches() -> Unit {
     let raw: String = "HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok";
-    assert_eq(expect_status(raw, Status::Http200Ok), true)
+    assert_eq(expect_status(raw, HttpStatus::Http200Ok), true)
 }
 
 test fn expect_status_differs() -> Unit {
     let raw: String = "HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok";
-    assert_eq(expect_status(raw, Status::Http404NotFound), false)
+    assert_eq(expect_status(raw, HttpStatus::Http404NotFound), false)
 }
 
 test fn expect_status_false_on_malformed() -> Unit {
-    assert_eq(expect_status("garbage", Status::Http200Ok), false)
+    assert_eq(expect_status("garbage", HttpStatus::Http200Ok), false)
 }
 
 // ── expect_body_contains ────────────────────────────────────────────────────
-
 test fn expect_body_contains_hit() -> Unit {
     let raw: String = "HTTP/1.0 200 OK\r\nContent-Length: 11\r\n\r\nhello world";
     assert_eq(expect_body_contains(raw, "world"), true)
@@ -120,7 +115,6 @@ test fn expect_body_contains_false_on_malformed() -> Unit {
 }
 
 // ── expect_header ───────────────────────────────────────────────────────────
-
 test fn expect_header_match() -> Unit {
     let raw: String = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nok";
     assert_eq(expect_header(raw, "Content-Type", "text/plain"), true)
@@ -137,13 +131,12 @@ test fn expect_header_missing_key() -> Unit {
 }
 
 // ── parse_response: multi-header and multi-line body ─────────────────────────
-
 test fn parse_response_first_of_multiple_headers() -> Unit {
     let raw: String = "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nX-Request-Id: abc\r\n\r\n{}";
     match parse_response(raw) {
         Err(_) => assert_eq(true, false),
-        Ok(r)  => match r.headers.get("Content-Type") {
-            None    => assert_eq(true, false),
+        Ok(r) => match r.headers.get("Content-Type") {
+            None => assert_eq(true, false),
             Some(v) => assert_eq(v, "application/json"),
         },
     }
@@ -153,8 +146,8 @@ test fn parse_response_second_of_multiple_headers() -> Unit {
     let raw: String = "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nX-Request-Id: abc\r\n\r\n{}";
     match parse_response(raw) {
         Err(_) => assert_eq(true, false),
-        Ok(r)  => match r.headers.get("X-Request-Id") {
-            None    => assert_eq(true, false),
+        Ok(r) => match r.headers.get("X-Request-Id") {
+            None => assert_eq(true, false),
             Some(v) => assert_eq(v, "abc"),
         },
     }
@@ -164,7 +157,7 @@ test fn parse_response_multiline_body() -> Unit {
     let raw: String = "HTTP/1.0 200 OK\r\nContent-Length: 9\r\n\r\nline one\r\nline two";
     match parse_response(raw) {
         Err(_) => assert_eq(true, false),
-        Ok(r)  => assert_eq(r.body, "line one\r\nline two"),
+        Ok(r) => assert_eq(r.body, "line one\r\nline two"),
     }
 }
 
@@ -172,7 +165,7 @@ test fn parse_response_body_only_first_line() -> Unit {
     let raw: String = "HTTP/1.0 201 Created\r\n\r\njust one line";
     match parse_response(raw) {
         Err(_) => assert_eq(true, false),
-        Ok(r)  => assert_eq(r.body, "just one line"),
+        Ok(r) => assert_eq(r.body, "just one line"),
     }
 }
 
@@ -180,20 +173,19 @@ test fn parse_response_no_headers_no_body() -> Unit {
     let raw: String = "HTTP/1.0 204 No Content\r\n\r\n";
     match parse_response(raw) {
         Err(_) => assert_eq(true, false),
-        Ok(r)  => assert_eq(r.body, ""),
+        Ok(r) => assert_eq(r.body, ""),
     }
 }
 
 // ── expect_status/body/header: 201 and 500 variants ─────────────────────────
-
 test fn expect_status_201() -> Unit {
     let raw: String = "HTTP/1.0 201 Created\r\n\r\nok";
-    assert_eq(expect_status(raw, Status::Http201Created), true)
+    assert_eq(expect_status(raw, HttpStatus::Http201Created), true)
 }
 
 test fn expect_status_500() -> Unit {
     let raw: String = "HTTP/1.0 500 Internal Server Error\r\n\r\nerr";
-    assert_eq(expect_status(raw, Status::Http500InternalServerError), true)
+    assert_eq(expect_status(raw, HttpStatus::Http500InternalServerError), true)
 }
 
 test fn expect_body_contains_204_has_no_content() -> Unit {

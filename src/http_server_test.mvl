@@ -9,22 +9,19 @@
 // runtime support for by-value function pointers with struct arguments — a
 // known limitation tracked separately.  These tests cover the underlying
 // routing behaviour that the actors depend on.
-
 // `new_router`, `route`, `dispatch` — pub in http.mvl, available here.
 // `parse_request_str` — test helper wrapping the pub `parse_request`.
-
 fn parse_request_str(s: String) -> Result[Request, HttpError] {
     parse_request(relabel taint(s, "HTTP-TEST"))
 }
 
 // ── Routing tests (underpins ConnectionHandler.handle behaviour) ─────────────
-
 test fn server_router_dispatches_static_path() -> Unit {
     let r: Router = route(new_router(), Method::Get, "/health", "health");
     match parse_request_str("GET /health HTTP/1.0\r\n\r\n") {
-        Err(_)  => assert(false),
+        Err(_) => assert(false),
         Ok(req) => match dispatch(r, req) {
-            Err(_)      => assert(false),
+            Err(_) => assert(false),
             Ok(matched) => assert_eq(matched.name, "health"),
         },
     }
@@ -33,13 +30,13 @@ test fn server_router_dispatches_static_path() -> Unit {
 test fn server_router_extracts_path_param() -> Unit {
     let r: Router = route(new_router(), Method::Get, "/users/{id}", "user");
     match parse_request_str("GET /users/42 HTTP/1.0\r\n\r\n") {
-        Err(_)  => assert(false),
+        Err(_) => assert(false),
         Ok(req) => match dispatch(r, req) {
-            Err(_)      => assert(false),
+            Err(_) => assert(false),
             Ok(matched) => {
                 assert_eq(matched.name, "user");
                 match matched.params.get("id") {
-                    None    => assert(false),
+                    None => assert(false),
                     Some(v) => assert_eq(v, "42"),
                 }
             },
@@ -50,10 +47,10 @@ test fn server_router_extracts_path_param() -> Unit {
 test fn server_router_returns_404_for_unknown_path() -> Unit {
     let r: Router = route(new_router(), Method::Get, "/known", "known");
     match parse_request_str("GET /unknown HTTP/1.0\r\n\r\n") {
-        Err(_)  => assert(false),
+        Err(_) => assert(false),
         Ok(req) => match dispatch(r, req) {
-            Ok(_)   => assert(false),
-            Err(e)  => assert_eq(e.status, Status::Http404NotFound),
+            Ok(_) => assert(false),
+            Err(e) => assert_eq(e.status, HttpStatus::Http404NotFound),
         },
     }
 }
@@ -61,22 +58,20 @@ test fn server_router_returns_404_for_unknown_path() -> Unit {
 test fn server_router_returns_405_for_wrong_method() -> Unit {
     let r: Router = route(new_router(), Method::Get, "/data", "data");
     match parse_request_str("POST /data HTTP/1.0\r\n\r\n") {
-        Err(_)  => assert(false),
+        Err(_) => assert(false),
         Ok(req) => match dispatch(r, req) {
-            Ok(_)   => assert(false),
-            Err(e)  => assert_eq(e.status, Status::Http405MethodNotAllowed),
+            Ok(_) => assert(false),
+            Err(e) => assert_eq(e.status, HttpStatus::Http405MethodNotAllowed),
         },
     }
 }
 
 test fn server_router_first_match_wins() -> Unit {
-    let r: Router = route(route(new_router(),
-        Method::Get, "/x", "first"),
-        Method::Get, "/x", "second");
+    let r: Router = route(route(new_router(), Method::Get, "/x", "first"), Method::Get, "/x", "second");
     match parse_request_str("GET /x HTTP/1.0\r\n\r\n") {
-        Err(_)  => assert(false),
+        Err(_) => assert(false),
         Ok(req) => match dispatch(r, req) {
-            Err(_)      => assert(false),
+            Err(_) => assert(false),
             Ok(matched) => assert_eq(matched.name, "first"),
         },
     }
@@ -85,17 +80,17 @@ test fn server_router_first_match_wins() -> Unit {
 test fn server_router_multi_segment_path_param() -> Unit {
     let r: Router = route(new_router(), Method::Get, "/api/{version}/items/{id}", "item");
     match parse_request_str("GET /api/v2/items/99 HTTP/1.0\r\n\r\n") {
-        Err(_)  => assert(false),
+        Err(_) => assert(false),
         Ok(req) => match dispatch(r, req) {
-            Err(_)      => assert(false),
+            Err(_) => assert(false),
             Ok(matched) => {
                 assert_eq(matched.name, "item");
                 match matched.params.get("version") {
-                    None    => assert(false),
+                    None => assert(false),
                     Some(v) => {
                         assert_eq(v, "v2");
                         match matched.params.get("id") {
-                            None     => assert(false),
+                            None => assert(false),
                             Some(id) => assert_eq(id, "99"),
                         }
                     },
