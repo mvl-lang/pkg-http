@@ -3,7 +3,7 @@
 // Built on std.net primitives.  No extern blocks.
 //
 // Import (types + parsing):
-//   use pkg.http.{HttpStatus, Method, Request, Response, HttpError,
+//   use pkg.http.{HttpStatus, HttpMethod, Request, Response, HttpError,
 //                  parse_request, serialize_response, respond, error_response,
 //                  query_first, query_all}
 //
@@ -127,9 +127,9 @@ pub total fn is_success(s: val HttpStatus) -> Bool {
 /// True for 4xx and 5xx status codes.
 pub total fn is_error(s: val HttpStatus) -> Bool { status_code(s) >= 400 }
 
-// ── Method ────────────────────────────────────────────────────────────────────
+// ── HttpMethod ────────────────────────────────────────────────────────────────────
 /// HTTP request method.
-pub type Method = enum {
+pub type HttpMethod = enum {
     Get,
     Post,
     Put,
@@ -149,7 +149,7 @@ pub type Method = enum {
 /// `headers` stores lowercased header names — use `header()` for lookup.
 /// `body` is the raw request body, labelled `Tainted` (HTTP-BODY).
 pub type Request = struct {
-    method: Method,
+    method: HttpMethod,
     path: String,
     query: Map[String, List[Tainted[String]]],
     headers: Map[String, String],
@@ -184,37 +184,37 @@ total fn require(
     }
 }
 
-/// Parse an HTTP method string ("GET", "POST", etc.) into a Method enum.
-/// Return the canonical uppercase name for a Method.
-pub total fn method_name(m: val Method) -> String {
+/// Parse an HTTP method string ("GET", "POST", etc.) into a HttpMethod enum.
+/// Return the canonical uppercase name for a HttpMethod.
+pub total fn method_name(m: val HttpMethod) -> String {
     match m {
-        Method::Get => "GET",
-        Method::Post => "POST",
-        Method::Put => "PUT",
-        Method::Delete => "DELETE",
-        Method::Patch => "PATCH",
-        Method::Head => "HEAD",
-        Method::Options => "OPTIONS",
+        HttpMethod::Get => "GET",
+        HttpMethod::Post => "POST",
+        HttpMethod::Put => "PUT",
+        HttpMethod::Delete => "DELETE",
+        HttpMethod::Patch => "PATCH",
+        HttpMethod::Head => "HEAD",
+        HttpMethod::Options => "OPTIONS",
     }
 }
 
-/// Parse an HTTP method string into a Method enum.
+/// Parse an HTTP method string into a HttpMethod enum.
 /// Returns `Err(HttpError)` with status 400 if the method is unknown.
-pub total fn parse_method(s: String) -> Result[Method, HttpError] {
+pub total fn parse_method(s: String) -> Result[HttpMethod, HttpError] {
     if s == "GET" {
-        Ok(Method::Get)
+        Ok(HttpMethod::Get)
     } else if s == "POST" {
-        Ok(Method::Post)
+        Ok(HttpMethod::Post)
     } else if s == "PUT" {
-        Ok(Method::Put)
+        Ok(HttpMethod::Put)
     } else if s == "DELETE" {
-        Ok(Method::Delete)
+        Ok(HttpMethod::Delete)
     } else if s == "PATCH" {
-        Ok(Method::Patch)
+        Ok(HttpMethod::Patch)
     } else if s == "HEAD" {
-        Ok(Method::Head)
+        Ok(HttpMethod::Head)
     } else if s == "OPTIONS" {
-        Ok(Method::Options)
+        Ok(HttpMethod::Options)
     } else {
         Err(HttpError { status: HttpStatus::Http400BadRequest, detail: "unknown HTTP method" })
     }
@@ -231,44 +231,6 @@ pub total fn parse_method(s: String) -> Result[Method, HttpError] {
 // Output is already decoded — do NOT pass it back into another percent-decoder
 // (double-decode is the dangerous bug class; the value carries Tainted, the
 // decoded form does not need re-decoding).
-total fn hex_digit(c: String) -> Option[Int] {
-    if c == "0" {
-        Some(0)
-    } else if c == "1" {
-        Some(1)
-    } else if c == "2" {
-        Some(2)
-    } else if c == "3" {
-        Some(3)
-    } else if c == "4" {
-        Some(4)
-    } else if c == "5" {
-        Some(5)
-    } else if c == "6" {
-        Some(6)
-    } else if c == "7" {
-        Some(7)
-    } else if c == "8" {
-        Some(8)
-    } else if c == "9" {
-        Some(9)
-    } else if c == "a" || c == "A" {
-        Some(10)
-    } else if c == "b" || c == "B" {
-        Some(11)
-    } else if c == "c" || c == "C" {
-        Some(12)
-    } else if c == "d" || c == "D" {
-        Some(13)
-    } else if c == "e" || c == "E" {
-        Some(14)
-    } else if c == "f" || c == "F" {
-        Some(15)
-    } else {
-        None
-    }
-}
-
 /// Wrap `from_int` with an explicit [0, 255] constraint.
 ///
 /// Creates a refinement proof obligation at each call site — callers must prove
@@ -354,7 +316,7 @@ total fn percent_decode(s: String) -> String {
     let pct_buf: ref String = "";
     for c in s.chars() {
         if pct_buf == "%" {
-            match hex_digit(c) {
+            match c.hex_char_value() {
                 Some(_) => {
                     pct_buf = pct_buf.concat(c);
                 },
@@ -373,9 +335,9 @@ total fn percent_decode(s: String) -> String {
                 },
             }
         } else if pct_buf.len() == 2 {
-            match hex_digit(c) {
+            match c.hex_char_value() {
                 Some(low) => {
-                    match hex_digit(pct_buf.char_at(1).unwrap_or("0")) {
+                    match pct_buf.char_at(1).unwrap_or("0").hex_char_value() {
                         Some(high) => {
                             if high >= 0 && high <= 15 && low >= 0 && low <= 15 {
                                 pending.push(hex_byte(high, low));
@@ -431,15 +393,15 @@ total fn percent_decode(s: String) -> String {
 
 // Re-decode the high nibble from the char stored in pct_buf.
 // pct_buf == "%X" so pct_buf.char_at(1) is X — always a valid hex char
-// because it was stored only after hex_digit returned Some.
-// Both `high` and `low` come from hex_digit in this scope → both are
+// because it was stored only after String::hex_char_value returned Some.
+// Both `high` and `low` come from hex_char_value in this scope → both are
 // known to be in [0,15], making hex_byte(high, low) L1:trivial.
-// hex_digit returns [0,15] for both nibbles.
+// hex_char_value returns Option[Int] in [0,15] for both nibbles.
 // Explicit guard lets the prover discharge hex_byte's
 // `where` constraints at L1:trivial (same pattern as
 // the `cp >= 0 && cp <= 255` guard in utf8_from_bytes).
 // The else branch is unreachable in practice.
-// Unreachable: pct_buf[1] was accepted by hex_digit when stored.
+// Unreachable: pct_buf[1] was accepted by hex_char_value when stored.
 // Emit the partial escape literally and continue.
 // Flush trailing state: pending bytes, then any partial escape (`%` or `%X`).
 // ── Query parsing ─────────────────────────────────────────────────────────────
@@ -606,7 +568,7 @@ pub total fn parse_request(raw: Tainted[String]) -> Result[Request, HttpError] {
     let parts: List[String] = request_line.split(" ");
     let method_str: String = require(parts.get(0), "missing method")?;
     let target: String = require(parts.get(1), "missing path")?;
-    let method: Method = parse_method(method_str)?;
+    let method: HttpMethod = parse_method(method_str)?;
     let pq: PathQuery = split_target(target);
     let query: Map[String, List[Tainted[String]]] = parse_query(pq.query);
     let n: Int = lines.len();
@@ -702,7 +664,7 @@ pub total fn not_found() -> Response { respond(HttpStatus::Http404NotFound, "") 
 /// `/users/42` and extracts `{"id": "42"}`.  `name` identifies the handler —
 /// callers use it after `dispatch()` returns to invoke the actual handler.
 pub type Route = struct {
-    method: Method,
+    method: HttpMethod,
     pattern: String,
     name: String,
 }
@@ -724,7 +686,7 @@ pub total fn new_router() -> Router { Router { routes: [] } }
 /// Append a route to the router (first registered, first matched).
 pub total fn route(
     r: val Router,
-    method: Method,
+    method: HttpMethod,
     pattern: String,
     name: String,
 ) -> Router {
@@ -820,8 +782,8 @@ pub total fn dispatch(
 //
 // Usage:
 //   let router: Router = route(route(new_router(),
-//       Method::Get, "/hello", "hello"),
-//       Method::Post, "/echo", "echo");
+//       HttpMethod::Get, "/hello", "hello"),
+//       HttpMethod::Post, "/echo", "echo");
 //
 //   fn my_dispatch(req: Request, matched: MatchedRoute) -> Response {
 //       match matched.name {

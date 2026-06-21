@@ -1,18 +1,22 @@
 # ADR-0002: Explicit `total fn` Annotation Policy
 
 **Status:** Accepted
-**Date:** 2026-06-18
-**Context:** MVL infers totality for functions that have no unbounded loops and no calls to `partial fn`. These show up as `total*` (implicit) in `mvl assurance`. The question is: should pkg-http rely on inference or annotate explicitly?
+**Date:** 2026-06-21
+
+## Context
+
+MVL infers totality for functions that have no unbounded loops and no calls to `partial fn`. These show up as `total*` (implicit) in `mvl assurance`. The question is: should pkg-http rely on inference, or annotate explicitly?
 
 ## Decision
 
-**All functions that are total must carry the explicit `total fn` keyword.** No implicit totality (`total*`) is permitted in source files.
+**Every function in pkg-http that is total must carry the explicit `total fn` keyword.** No implicit totality (`total*`) is permitted in source files.
 
-Rationale:
-- `mvl assurance` reports `52 total fn (52 explicit, 0 implicit)` — this is the target state.
-- Explicit annotation is a contract: the author claims termination and exhaustiveness, and the checker verifies it. Implicit totality is a silent default that can be broken by adding a call to a `partial fn` without realising the impact.
-- `total fn` on a function that calls `partial fn` is a compile error — this is the intended safety net.
+## Rationale
+
+- Explicit annotation is a contract: the author claims termination and exhaustiveness, the checker verifies it.
+- Implicit totality is a silent default that can be broken by adding a call to a `partial fn` without realising the impact. With an explicit annotation, the compiler catches it.
 - `partial fn` is already explicit; totality should be equally explicit.
+- `mvl assurance` reports `N total fn (N explicit, 0 implicit)` — `0 implicit` is the gate.
 
 ## Application
 
@@ -29,19 +33,16 @@ Effect annotations are orthogonal: `pub total fn serve_dir(...) -> Response ! Fi
 
 ## What `partial fn` legitimately covers in pkg-http
 
-- `accept_loop`, `serve` — infinite TCP accept loop
-- `json_ok`, `json_created`, `json_error` — call `std.json.encode` which is `partial fn`
-- `body_json`, `body_obj` — call `std.json.decode` which is `partial fn`
-- `parse_response`, `parse_rest`, `expect_*` — in `testing.mvl`, call the above
+- `accept_loop`, `serve` — infinite TCP accept loop (intentional non-termination)
+- `parse_response`, `expect_*` in `testing.mvl` — call `parse_rest` which is partial
 
 ## Consequences
 
-- `make assurance` will report `0 implicit total` — use this as the gate.
-- Any new function added without a totality keyword will appear as `total*` and fail the policy check.
-- Reviewers should reject PRs that introduce implicit totality.
+- `make assurance` reports `0 implicit total` — use this as the CI gate.
+- Any new function added without a totality keyword fails the policy.
+- Code reviewers reject PRs that introduce implicit totality.
 
 ## Connected to
 
-- MVL Req 3 (Totality): `mvl assurance` REQ3 verifies this
-- MVL Req 8 (Termination): `total fn` fns must have provable termination
-- ADR-0001: Mirror functions in test files intentionally omit `total` (they are not verified separately by the assurance tool)
+- MVL Req 3 (Totality)
+- MVL Req 8 (Termination)

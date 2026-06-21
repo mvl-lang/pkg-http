@@ -7,38 +7,55 @@ Thank you for your interest in contributing to the MVL HTTP package.
 1. Fork this repository
 2. Create a feature branch: `git checkout -b feat/my-feature`
 3. Make your changes
-4. Run the type checker: `mvl check src/http.mvl`
-5. Run tests: `mvl test src/http_test.mvl`
+4. Run the type checker: `make check`
+5. Run tests: `make test`
 6. Commit with a conventional message: `git commit -m "feat: add ..."`
 7. Push and open a pull request
 
 ## Development Setup
 
-You need the [MVL compiler](https://github.com/LAB271/mvl_language) installed:
+You need the [MVL compiler](https://github.com/mvl-lang/mvl) installed:
 
 ```bash
-# Build from source
-git clone https://github.com/LAB271/mvl_language.git
-cd mvl_language
-cargo build
+git clone https://github.com/mvl-lang/mvl.git
+cd mvl
+cargo build --release
 ```
+
+Add the resulting binary to your `PATH` (or use `make` targets from this repo, which auto-detect the local build).
 
 ## Code Style
 
-- Follow the MVL syntax conventions (see the [MVL cheat sheet](https://github.com/LAB271/mvl_language/blob/main/CLAUDE.md))
+- Follow the MVL syntax conventions (see the [MVL language docs](https://github.com/mvl-lang/mvl/blob/main/docs/language.md))
 - All public functions must have doc comments (`///`)
 - All functions must declare their effects
-- Use `total fn` where possible; `partial fn` only when unavoidable
+- Use `total fn` where possible; `partial fn` only when unavoidable (ADR-0002)
+- Refinement constraints should be over computed/user-supplied values, not literal wrappers (ADR-0003)
 - This package is pure MVL — no `bridge.rs` or `extern` blocks
+- pkg-http scope is **raw HTTP only** — JSON helpers belong in pkg-rest (ADR-0001)
 
 ## Testing
 
-Tests live in `src/http_test.mvl`, `src/http_server_test.mvl`, and `src/testing_test.mvl`.
-
 ```bash
-mvl check src/http.mvl           # type-check
-mvl test src/http_test.mvl       # run tests
+make check        # type-check all source files
+make test         # run tests
+make assurance    # full assurance report (totality, effects, refinements)
+make coverage     # branch coverage
 ```
+
+## Architectural Decisions
+
+See `.openspec/adr/` for the architectural decision records:
+
+- ADR-0001: Package Scope — Raw HTTP Only
+- ADR-0002: Explicit `total fn` Annotation Policy
+- ADR-0003: Refinement Proofs — Over Computed Values
+
+Read these before proposing structural changes.
+
+## Reporting Issues
+
+File issues at https://github.com/mvl-lang/pkg-http/issues. For transpiler or language bugs, file at https://github.com/mvl-lang/mvl/issues.
 
 ## License
 

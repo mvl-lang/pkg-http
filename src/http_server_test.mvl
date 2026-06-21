@@ -17,7 +17,7 @@ fn parse_request_str(s: String) -> Result[Request, HttpError] {
 
 // ── Routing tests (underpins ConnectionHandler.handle behaviour) ─────────────
 test fn server_router_dispatches_static_path() -> Unit {
-    let r: Router = route(new_router(), Method::Get, "/health", "health");
+    let r: Router = route(new_router(), HttpMethod::Get, "/health", "health");
     match parse_request_str("GET /health HTTP/1.0\r\n\r\n") {
         Err(_) => assert(false),
         Ok(req) => match dispatch(r, req) {
@@ -28,7 +28,7 @@ test fn server_router_dispatches_static_path() -> Unit {
 }
 
 test fn server_router_extracts_path_param() -> Unit {
-    let r: Router = route(new_router(), Method::Get, "/users/{id}", "user");
+    let r: Router = route(new_router(), HttpMethod::Get, "/users/{id}", "user");
     match parse_request_str("GET /users/42 HTTP/1.0\r\n\r\n") {
         Err(_) => assert(false),
         Ok(req) => match dispatch(r, req) {
@@ -45,7 +45,7 @@ test fn server_router_extracts_path_param() -> Unit {
 }
 
 test fn server_router_returns_404_for_unknown_path() -> Unit {
-    let r: Router = route(new_router(), Method::Get, "/known", "known");
+    let r: Router = route(new_router(), HttpMethod::Get, "/known", "known");
     match parse_request_str("GET /unknown HTTP/1.0\r\n\r\n") {
         Err(_) => assert(false),
         Ok(req) => match dispatch(r, req) {
@@ -56,7 +56,7 @@ test fn server_router_returns_404_for_unknown_path() -> Unit {
 }
 
 test fn server_router_returns_405_for_wrong_method() -> Unit {
-    let r: Router = route(new_router(), Method::Get, "/data", "data");
+    let r: Router = route(new_router(), HttpMethod::Get, "/data", "data");
     match parse_request_str("POST /data HTTP/1.0\r\n\r\n") {
         Err(_) => assert(false),
         Ok(req) => match dispatch(r, req) {
@@ -67,7 +67,7 @@ test fn server_router_returns_405_for_wrong_method() -> Unit {
 }
 
 test fn server_router_first_match_wins() -> Unit {
-    let r: Router = route(route(new_router(), Method::Get, "/x", "first"), Method::Get, "/x", "second");
+    let r: Router = route(route(new_router(), HttpMethod::Get, "/x", "first"), HttpMethod::Get, "/x", "second");
     match parse_request_str("GET /x HTTP/1.0\r\n\r\n") {
         Err(_) => assert(false),
         Ok(req) => match dispatch(r, req) {
@@ -78,7 +78,7 @@ test fn server_router_first_match_wins() -> Unit {
 }
 
 test fn server_router_multi_segment_path_param() -> Unit {
-    let r: Router = route(new_router(), Method::Get, "/api/{version}/items/{id}", "item");
+    let r: Router = route(new_router(), HttpMethod::Get, "/api/{version}/items/{id}", "item");
     match parse_request_str("GET /api/v2/items/99 HTTP/1.0\r\n\r\n") {
         Err(_) => assert(false),
         Ok(req) => match dispatch(r, req) {

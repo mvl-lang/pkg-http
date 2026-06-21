@@ -4,14 +4,35 @@ All notable changes to pkg-http will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] - 2026-06-21
+
+### Changed (BREAKING)
+- **Scope tightened to raw HTTP only** — JSON helpers (`json_ok`, `body_json`, `param_int`, etc.) moved to pkg-rest. See ADR-0001.
+- Renamed `Method` enum to `HttpMethod` (mirrors `HttpStatus` naming).
+- `rest.mvl` removed entirely from this package.
+
+### Removed
+- `src/rest.mvl` — moved to `pkg-rest/src/json.mvl`
+- `src/http_test.mvl` and `src/rest_test.mvl` — obsolete #96 redeclaration tests
+- ADR-0001 (test file mirror pattern) — workaround no longer needed
+
+### Added
+- New ADR-0001: Package Scope — Raw HTTP Only
+- Local `hex_digit` replaced with `std.strings.hex_char_value` (stdlib version)
+
+### Migration
+- `use pkg.http.{Method}` → `use pkg.http.{HttpMethod}`
+- `Method::Get` → `HttpMethod::Get`
+- `use pkg.http.{json_ok, body_json, ...}` → `use pkg.rest.json.{json_ok, body_json, ...}`
+
 ## [0.3.0] - 2026-06-20
 
 ### Changed (BREAKING)
-- Renamed `Status` enum to `HttpStatus` to avoid namespace collision when pkg-http is consumed alongside other packages (e.g., pkg-health). Workaround for transpiler module-resolution issue.
+- Renamed `Status` enum to `HttpStatus` to avoid namespace collision when pkg-http is consumed alongside other packages.
 
 ### Migration
-- Update imports: `use pkg.http.{Status}` → `use pkg.http.{HttpStatus}`
-- Update usages: `Status::Http200Ok` → `HttpStatus::Http200Ok`
+- `use pkg.http.{Status}` → `use pkg.http.{HttpStatus}`
+- `Status::Http200Ok` → `HttpStatus::Http200Ok`
 
 ## [0.2.3] - 2026-06-18
 
