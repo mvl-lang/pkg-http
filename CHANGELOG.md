@@ -4,6 +4,15 @@ All notable changes to pkg-http will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] - 2026-06-22
+
+### Changed (BREAKING)
+- Renamed `is_success(s: HttpStatus) -> Bool` → `is_2xx(s: HttpStatus) -> Bool`. The new name is wire-accurate: it checks the 2xx status class, not abstract "success." Consumers expressing semantic success ("did the call succeed") should use pkg-rest's `is_success` instead.
+
+### Migration
+- `use pkg.http.{is_success}` → `use pkg.http.{is_2xx}`
+- `is_success(resp.status)` → `is_2xx(resp.status)`
+
 ## [0.4.0] - 2026-06-21
 
 ### Changed (BREAKING)

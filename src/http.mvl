@@ -115,7 +115,7 @@ pub total fn status_reason(s: val HttpStatus) -> String {
 }
 
 /// True for 2xx status codes.
-pub total fn is_success(s: val HttpStatus) -> Bool {
+pub total fn is_2xx(s: val HttpStatus) -> Bool {
     let code: Int = status_code(s);
     if code >= 200 {
         code < 300
