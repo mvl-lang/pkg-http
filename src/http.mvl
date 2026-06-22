@@ -61,7 +61,7 @@ pub type HttpStatus = enum {
 ///
 /// Refined return type `[100, 600)` is statically declared — every enum variant maps
 /// to a constant that the checker can verify satisfies the bound without a wrapper call.
-pub total fn status_code(s: val HttpStatus) -> Int where self >= 100 && self < 600 {
+pub total fn status_code(s: val HttpStatus) -> Int where self >= 200 && self < 600 {
     match s {
         HttpStatus::Http200Ok => 200,
         HttpStatus::Http201Created => 201,
