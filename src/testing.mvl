@@ -7,8 +7,6 @@
 //                 expect_body_contains, expect_header}
 //
 // See #951.
-use pkg.http.{HttpStatus, Response, HttpError, status_code, http_error}
-
 // ── HttpStatus reconstruction ────────────────────────────────────────────────────
 /// Map a numeric status code back to a HttpStatus enum.  Unknown codes are
 /// rejected with a 400-class error.
